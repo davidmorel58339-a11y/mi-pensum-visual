@@ -1,4 +1,4 @@
-Gestor Visual de Pensum 🎓
+# Gestor Visual de Pensum 🎓
 
 Una plataforma web interactiva "Client-Side" diseñada para optimizar la planificación académica de los estudiantes universitarios. Transforma el tradicional plan de estudios estático en un mapa de nodos dinámico, integrando herramientas de simulación y proyección de índice académico (GPA).
 
