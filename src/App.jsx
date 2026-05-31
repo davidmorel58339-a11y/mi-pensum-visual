@@ -76,7 +76,6 @@ function HelpPanel({ isDarkMode, isMobile }) {
             <li style={{ marginBottom: '6px' }}><b>Calculadora GPA:</b> Selecciona un trimestre en la barra izquierda, luego toca materias en el mapa para agregarlas.</li>
             <li style={{ marginBottom: '6px' }}><b>Predictor (Meta GPA):</b> El cálculo se basará automáticamente en tu <b>Índice Actual</b> generado en la pestaña de GPA.</li>
             <li style={{ marginBottom: '6px' }}><b>Simulador 🛒:</b> Descubre qué materias tienes "desbloqueadas" y arma tu próximo trimestre sin pasarte del límite.</li>
-            <li><b>Correquisitos:</b> Las líneas punteadas en el mapa indican laboratorios o materias que deben darse juntas.</li>
           </ul>
         </div>
       )}
