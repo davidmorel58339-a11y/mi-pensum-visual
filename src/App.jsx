@@ -4,7 +4,6 @@ import 'reactflow/dist/style.css';
 import SubjectNode from './SubjectNode';
 import TrimesterNode from './TrimesterNode';
 import CustomEdge from './CustomEdge';
-import { SpeedInsights } from "@vercel/speed-insights/react"
 
 const nodeTypes = { subject: SubjectNode, trimester: TrimesterNode };
 const edgeTypes = { customArch: CustomEdge };
@@ -51,6 +50,37 @@ class ErrorBoundary extends Component {
     }
     return this.props.children;
   }
+}
+
+// ==========================================
+// COMPONENTE DEL PANEL DE AYUDA
+// ==========================================
+function HelpPanel({ isDarkMode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const bg = isDarkMode ? '#7f1d1d' : '#ef4444';
+
+  return (
+    <div style={{ position: 'absolute', top: 15, right: 15, zIndex: 1000 }}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ background: bg, color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.2)', transition: 'background 0.2s' }}
+      >
+        {isOpen ? 'Cerrar Guía' : '¿Cómo usarlo? 📖'}
+      </button>
+      
+      {isOpen && (
+        <div style={{ marginTop: '10px', width: '320px', background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', border: `2px solid ${bg}`, boxShadow: '0 10px 15px rgba(0,0,0,0.3)', color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
+          <h4 style={{ margin: '0 0 10px 0', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`, paddingBottom: '5px' }}>Funciones Principales:</h4>
+          <ul style={{ fontSize: '12.5px', paddingLeft: '20px', lineHeight: '1.6', margin: 0 }}>
+            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Haz <i>doble clic</i> en cualquier materia para aislar su cadena de prerrequisitos y correquisitos en el mapa.</li>
+            <li style={{ marginBottom: '6px' }}><b>Calculadora GPA:</b> Selecciona un trimestre en la barra izquierda, luego toca materias en el mapa para agregarlas fácilmente.</li>
+            <li style={{ marginBottom: '6px' }}><b>Predictor (Meta GPA):</b> Ingresa el índice que deseas alcanzar y te diremos qué notas necesitas sacar en el futuro para lograrlo.</li>
+            <li><b>Simulador 🛒:</b> Actívalo para ver qué materias tienes "desbloqueadas" y armar tu próximo trimestre sin pasarte del límite de créditos.</li>
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ==========================================
@@ -552,7 +582,8 @@ function FlowApp() {
         onMouseOut={(e) => e.target.style.backgroundColor = isDarkMode ? '#334155' : '#e2e8f0'}
       />
 
-      <div style={{ flexGrow: 1, position: 'relative' }}>
+      {/* ÁREA DEL MAPA */}
+      <div style={{ flexGrow: 1, position: 'relative', width: '100%', height: '100%' }} ref={reactFlowWrapper}>
         <ReactFlow 
           nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick} onPaneClick={() => { setHighlightedNodeId(null); setFocusModeId(null); setActiveGpaTermId(null); }} 
@@ -562,6 +593,10 @@ function FlowApp() {
           <Controls />
         </ReactFlow>
 
+        {/* PANEL DE AYUDA (NUEVO) */}
+        <HelpPanel isDarkMode={isDarkMode} />
+
+        {/* LEYENDA INFERIOR */}
         <div style={{ position: 'absolute', bottom: 15, right: 15, background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 8px 15px -3px rgba(0, 0, 0, 0.3)', zIndex: 100, border: `1px solid ${borderPanel}`, minWidth: '200px' }}>
           
           {isSimulatorMode ? (
@@ -605,36 +640,6 @@ function FlowApp() {
   );
 }
 
-// --- COMPONENTE DEL PANEL DE AYUDA (Panel Rojo) ---
-function HelpPanel({ isDarkMode }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const bg = isDarkMode ? '#7f1d1d' : '#ef4444';
-
-  return (
-    <div style={{ position: 'absolute', top: 15, right: 15, zIndex: 1000 }}>
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        style={{ background: bg, color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}
-      >
-        {isOpen ? 'Cerrar Guía' : '¿Cómo usarlo? 📖'}
-      </button>
-      
-      {isOpen && (
-        <div style={{ marginTop: '10px', width: '300px', background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', border: `2px solid ${bg}`, boxShadow: '0 10px 15px rgba(0,0,0,0.3)', color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
-          <h4 style={{ margin: '0 0 10px 0' }}>Funciones Principales:</h4>
-          <ul style={{ fontSize: '12px', paddingLeft: '20px', lineHeight: '1.6' }}>
-            <li><b>Mapa:</b> Doble clic en materia para modo enfoque.</li>
-            <li><b>GPA:</b> Selecciona un trimestre, luego toca materias en el mapa para agregarlas.</li>
-            <li><b>Simulador:</b> Actívalo para ver qué materias puedes inscribir según tus aprobadas.</li>
-            <li><b>Datos:</b> Tus cambios se guardan automáticamente en tu navegador.</li>
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ... (Luego en tu return dentro de FlowApp, añade <HelpPanel isDarkMode={isDarkMode} /> al final del JSX)
 export default function App() { 
   return (
     <ReactFlowProvider>
