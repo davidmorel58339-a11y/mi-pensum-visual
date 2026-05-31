@@ -271,7 +271,16 @@ function FlowApp() {
 
     if (isSimulatorMode && activeTab === 'map') {
       const nData = baseGraph.subjectDict[clickedNode.id];
-      const isEligible = !passedIds.has(clickedNode.id) && (nData?.prereqs || []).every(pr => passedIds.has(pr));
+      const isEligible = !passedIds.has(clickedNode.id) && (nData?.prereqs || []).every(pr => {
+        if (passedIds.has(pr)) return true;
+        // Lógica inteligente para correquisitos (Teoría <-> Laboratorio terminados en L)
+        if (clickedNode.id.replace('L', '') === pr || pr.replace('L', '') === clickedNode.id) {
+          const cData = baseGraph.subjectDict[pr];
+          return cData && (cData.prereqs || []).every(cPr => cPr === clickedNode.id || passedIds.has(cPr));
+        }
+        return false;
+      });
+      
       if (isEligible) {
         setSimulatorCart(prev => { const next = new Set(prev); next.has(clickedNode.id) ? next.delete(clickedNode.id) : next.add(clickedNode.id); return next; });
       }
@@ -345,7 +354,17 @@ function FlowApp() {
           const isLocked = isStrictMode && (n.data.prereqs || []).some(pr => !passedIds.has(pr));
           const isTarget = n.id === targetId;
           const isConnected = upstream.has(n.id) || downstream.has(n.id);
-          const isSimulatorEligible = isSimulatorMode && activeTab === 'map' && !isPassed && (n.data.prereqs || []).every(pr => passedIds.has(pr));
+          
+          // Lógica de Simulador que detecta Correquisitos
+          const isSimulatorEligible = isSimulatorMode && activeTab === 'map' && !isPassed && (n.data.prereqs || []).every(pr => {
+            if (passedIds.has(pr)) return true;
+            if (n.id.replace('L', '') === pr || pr.replace('L', '') === n.id) {
+              const cData = baseGraph.subjectDict[pr];
+              return cData && (cData.prereqs || []).every(cPr => cPr === n.id || passedIds.has(cPr));
+            }
+            return false;
+          });
+
           const isInSimulatorCart = isSimulatorMode && activeTab === 'map' && simulatorCart.has(n.id);
           if (isInSimulatorCart) simCredits += n.data.credits;
           const isSelectedForGoal = activeTab === 'goal' && goalSubjects.has(n.id);
@@ -696,7 +715,7 @@ function FlowApp() {
                   
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold' }}>
-                    Bloqueo de materias con pre-req incumplidos🔒
+                    Bloqueo Estricto 🔒
                     <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
                   </label>
                 </>
