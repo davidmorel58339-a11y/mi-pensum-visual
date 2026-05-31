@@ -4,6 +4,7 @@ import 'reactflow/dist/style.css';
 import SubjectNode from './SubjectNode';
 import TrimesterNode from './TrimesterNode';
 import CustomEdge from './CustomEdge';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const nodeTypes = { subject: SubjectNode, trimester: TrimesterNode };
 const edgeTypes = { customArch: CustomEdge };
