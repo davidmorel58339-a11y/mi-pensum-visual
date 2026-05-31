@@ -30,12 +30,18 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '40px', background: '#fee2e2', color: '#991b1b', height: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>¡Ups! Algo se rompió </h1>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>¡Ups! Algo se rompió 😢</h1>
           <p>Por favor, pásame este mensaje de error para solucionarlo:</p>
           <pre style={{ background: '#fef2f2', padding: '15px', borderRadius: '8px', overflowX: 'auto', border: '1px solid #fca5a5' }}>
             {this.state.error && this.state.error.toString()}<br/>
             {this.state.errorInfo && this.state.errorInfo.componentStack}
           </pre>
+          <button 
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            style={{ marginTop: '20px', padding: '10px 20px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            Borrar Memoria Dañada y Reiniciar
+          </button>
         </div>
       );
     }
@@ -63,10 +69,11 @@ function HelpPanel({ isDarkMode, isMobile }) {
         <div style={{ marginTop: '10px', width: isMobile ? '260px' : '320px', background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', border: `2px solid ${bg}`, boxShadow: '0 10px 15px rgba(0,0,0,0.3)', color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
           <h4 style={{ margin: '0 0 10px 0', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`, paddingBottom: '5px', fontSize: isMobile ? '13px' : '15px' }}>Funciones Principales:</h4>
           <ul style={{ fontSize: isMobile ? '11.5px' : '12.5px', paddingLeft: '20px', lineHeight: '1.6', margin: 0 }}>
-            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Haz <i>clic</i> en cualquier materia para aislar su cadena de prerrequisitos en el mapa.</li>
-            <li style={{ marginBottom: '6px' }}><b>Calculadora GPA:</b> Añade y selecciona un trimestre en la barra izquierda, luego toca materias en el mapa para agregarlas (o ingresa manualmente tu indice en trimestres pasados).</li>
+            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Haz <i>doble clic</i> en cualquier materia para aislar su cadena de prerrequisitos en el mapa.</li>
+            <li style={{ marginBottom: '6px' }}><b>Calculadora GPA:</b> Selecciona un trimestre en la barra izquierda, luego toca materias en el mapa para agregarlas.</li>
             <li style={{ marginBottom: '6px' }}><b>Predictor (Meta GPA):</b> El cálculo se basará automáticamente en tu <b>Índice Actual</b> generado en la pestaña de GPA.</li>
             <li style={{ marginBottom: '6px' }}><b>Simulador 🛒:</b> Descubre qué materias tienes "desbloqueadas" y arma tu próximo trimestre sin pasarte del límite.</li>
+            <li><b>Correquisitos:</b> Las líneas punteadas en el mapa indican laboratorios o materias que deben darse juntas.</li>
           </ul>
         </div>
       )}
@@ -540,7 +547,8 @@ function FlowApp() {
                   const maxCredits = term.overcredit ? 26 : 21;
                   const isOverLimit = term.totalCreditsAttempted > maxCredits;
                   return (
-                  <div key={term.id} onClick={() => { setActiveGpaTermId(term.id); if(isMobile) setSidebarOpen(false); }} style={{ background: activeGpaTermId === term.id ? (isDarkMode ? '#1e3a8a' : '#f0f9ff') : (isDarkMode ? '#1e293b' : '#f8fafc'), border: `2px solid ${activeGpaTermId === term.id ? '#3b82f6' : borderPanel}`, borderRadius: '12px', padding: '12px', cursor: 'pointer' }}>
+                  {/* CORRECCIÓN APLICADA AQUÍ */}
+                  <div key={term.id} onClick={() => setActiveGpaTermId(term.id)} style={{ background: activeGpaTermId === term.id ? (isDarkMode ? '#1e3a8a' : '#f0f9ff') : (isDarkMode ? '#1e293b' : '#f8fafc'), border: `2px solid ${activeGpaTermId === term.id ? '#3b82f6' : borderPanel}`, borderRadius: '12px', padding: '12px', cursor: 'pointer' }}>
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                        <h4 style={{ margin: 0, color: textPanel, fontSize: '14px' }}>{term.name}</h4>
                        <div style={{ background: isDarkMode ? '#0f172a' : '#0f172a', color: 'white', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold', fontSize: '11px' }}>GPA: {term.gpa}</div>
@@ -559,10 +567,16 @@ function FlowApp() {
                             <span style={{ color: isOverLimit ? '#ef4444' : '#64748b', fontWeight: isOverLimit ? 'bold' : 'normal' }}>Créditos: {term.totalCreditsAttempted} / {maxCredits}</span>
                             <label><input type="checkbox" checked={term.overcredit} onChange={() => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, overcredit: !t.overcredit } : t))} /> 26 CR</label>
                           </div>
+                          
+                          {/* BOTON EXTRA PARA VER EL MAPA DESDE EL TRIMESTRE */}
                           <div style={{ display: 'flex', gap: '5px', marginBottom: '10px', alignItems: 'center' }}>
                             <button onClick={(e) => { e.stopPropagation(); loadOfficialTrimester(term.id); }} style={{ flex: 1, fontSize: '11px', padding: '6px', background: isDarkMode ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cargar Pensum</button>
                             <span style={{ fontSize: '11px', color: '#64748b' }}>o Toca materias 👉</span>
+                            {isMobile && (
+                               <button onClick={(e) => { e.stopPropagation(); setSidebarOpen(false); }} style={{ fontSize: '11px', padding: '6px 10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Ver Mapa</button>
+                            )}
                           </div>
+
                           {(term.subjects || []).map(s => {
                             const info = baseGraph.subjectDict[s.code];
                             return (
@@ -683,7 +697,7 @@ function FlowApp() {
                   
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold' }}>
-                    Bloqueo de mateiras con pre-req incumplidos🔒
+                    Bloqueo Estricto 🔒
                     <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
                   </label>
                 </>
