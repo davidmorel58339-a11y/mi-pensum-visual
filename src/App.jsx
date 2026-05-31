@@ -648,9 +648,10 @@ function FlowApp() {
         </div>
         
         {/* FOOTER DE CRÉDITOS */}
-        <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', borderTop: `1px solid ${borderPanel}`, background: isDarkMode ? '#0f172a' : '#f8fafc', color: '#64748b' }}>
-          Creado por <b>David Morel (IB)</b> <br/>
-          <a href="https://www.linkedin.com/in/david-morel-durán-510569303" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 'bold' }}>Conectar en LinkedIn</a>
+        {/* FOOTER DE CRÉDITOS */}
+        <div style={{ margin: '15px', padding: '10px', textAlign: 'center', fontSize: '10px', background: isDarkMode ? '#0f172a' : '#e2e8f0', color: isDarkMode ? '#475569' : '#94a3b8', borderRadius: '8px' }}>
+          Creado por David Morel (IB) <br/>
+          <a href="https://www.linkedin.com/in/david-morel-durán-510569303" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Conectar en LinkedIn</a>
         </div>
       </div>
 
@@ -721,7 +722,7 @@ function FlowApp() {
                   
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold' }}>
-                    Bloqueo Estricto 🔒
+                    Bloqueo de materias con pre-req incumplidos🔒
                     <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
                   </label>
                 </>
