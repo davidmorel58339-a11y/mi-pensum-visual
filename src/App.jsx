@@ -1,0 +1,645 @@
+import React, { useState, useCallback, useRef, useEffect, useMemo, Component } from 'react';
+import ReactFlow, { Background, Controls, MarkerType, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, ReactFlowProvider } from 'reactflow';
+import 'reactflow/dist/style.css';
+import SubjectNode from './SubjectNode';
+import TrimesterNode from './TrimesterNode';
+import CustomEdge from './CustomEdge';
+
+const nodeTypes = { subject: SubjectNode, trimester: TrimesterNode };
+const edgeTypes = { customArch: CustomEdge };
+const gradingScale = { 'A+': 4.00, 'A': 3.75, 'B+': 3.50, 'B': 3.00, 'C+': 2.50, 'C': 2.00, 'D': 1.00, 'F': 0.00 };
+
+// ==========================================
+// BASE DE DATOS DE PENSUMS PRECARGADOS
+// ==========================================
+const PRELOADED_PENSUMS = {
+  IBM_2020: `# Trimestre 1\nAHC109 | REDACCION | | 4\nAHO102 | ORIENTACION ACADEMICA E INSTITUCIONAL | | 0\nCBA1X3 | VIDA EN EL MEDIO AMBIENTE | | 2\nCBM101 | ALGEBRA Y GEOMETRIA ANALITICA | | 5\nCSH112 | CIUDADANIA Y ETICA | | 2\nEAA1X1 | ELECTIVAS DE AREAS ACADEMICAS I | | 2\nEAA1X2 | ELECTIVAS DE AREAS ACADEMICAS II | | 2\nEAA1X3 | ELECTIVAS DE AREAS ACADEMICAS III | | 2\nIBI201 | INTRODUCCION A LA INGENIERIA BIOMEDICA | | 2\nSH1103 | INGLES 01 (BASICO I) | | 0\n\n# Trimestre 2\nAHC110 | ARGUMENTACIÓN LINGÜÍSTICA | AHC109 | 4\nCBB302 | BIOLOGIA CELULAR Y MOLECULAR EN BIOMEDICA | | 4\nCBB302L | LABORATORIO DE BIOLOGIA CELULAR Y MOLECULAR | CBB302 | 1\nCBM102 | CALCULO DIFERENCIAL | CBM101 | 5\nCSS102 | SER HUMANO Y SOCIEDAD | | 2\nEAA1X4 | ELECTIVAS DE AREAS ACADEMICAS IV | | 2\nING102 | INTRODUCCION A LA PROGRAMACION | CBM101 | 2\nING102L | LABORATORIO DE INTRODUCCION A LA PROGRAMACION | CBM101, ING102 | 0\nSHI104 | INGLES 02 (BASICO II) | SH1103 | 0\n\n# Trimestre 3\nAHQ101 | QUEHACER CIENTIFICO | | 4\nCBF210 | FISICA MECANICA I | CBM201 | 4\nCBF210L | LABORATORIO DE FISICA MECANICA I | CBF210 | 1\nCBM201 | CALCULO INTEGRAL | CBM102 | 5\nCBQ207 | QUIMICA I | CBM102 | 4\nCBQ207L | LABORATORIO DE QUIMICA I | CBM102, CBQ207 | 1\nCSH113 | PENSAMIENTO CREATIVO | | 2\nSH1105 | INGLES 03 (INTERMEDIO I) | SHI104 | 0\n\n# Trimestre 4\nCBF211 | FISICA MECANICA II | CBF210, CBF210L, CBM201 | 4\nCBF211L | LABORATORIO DE FISICA MECANICA II | CBF210, CBF210L, CBM201, CBF211 | 1\nCBM202 | CALCULO VECTORIAL | CBM201 | 5\nING227 | GRAFICOS EN INGENIERIA | | 4\nING229 | INTRODUCCION A LA CIENCIA DE MATERIALES | CBQ207 | 4\nING229L | LABORATORIO DE INTRODUCCION A LA CIENCIA DE MATERIALES | CBQ207, ING229 | 1\nING236L | LABORATORIO DE GRAFICOS EN INGENIERIA | ING227 | 1\nSH1106 | INGLES 04 (INTERMEDIO II) | SH1105 | 0\n\n# Trimestre 5\nCBF212 | FISICA ELECTRICA Y MAGNETICA | CBF211, CBF211L | 4\nCBF212L | LABORATORIO DE FISICA ELECTRICA Y MAGNETICA | CBF212 | 1\nCBM208 | ALGEBRA LINEAL | CBM202 | 5\nIBI319 | ΑΝΑΤΟΜΙΑ EN INGENIERIA BIOMEDICA | | 4\nIBI319L | LABORATORIO DE ANATOMIA EN INGENIERIA BIOMEDICA | IBI319 | 1\nING216 | ESTATICA | CBF211, CBF211L | 4\nING216L | LABORATORIO DE ESTATICA | ING216 | 1\nING228 | HOJA DE CALCULO PARA INGENIEROS | ING102, ING102L | 1\nSHI107 | INGLES 05 (AVANZADO I) | SH1106 | 0\n\n# Trimestre 6\nCBM203 | ECUACIONES DIFERENCIALES | CBM208 | 5\nCSH105 | PROYECTO INTEGRADOR DE ESTUDIOS GENERALES | | 2\nIBI320 | FISIOLOGIA EN INGENIERIA BIOMEDICA | IBI319, IBI319L | 4\nIBI320L | LABORATORIO FISIOLOGIA EN INGENIERIA BIOMEDICA | IBI319, IBI319L, IBI320 | 1\nINE377 | CIRCUITOS I | CBF212, CBF212L | 4\nINE377L | LABORATORIO DE CIRCUITOS I | CBF212, CBF212L, INE377 | 1\nING214 | ANALISIS DE DATOS EN INGENIERIA | | 4\nSHI108 | INGLES 06 (AVANZADO II) | SHI107 | 0\n\n# Trimestre 7\nCBM311 | METODOS MATEMATICOS PARA INGENIEROS | | 4\nEEE2X1 | ELECTIVAS DE ESTUDIOS ESPECIALIZADOS I | | 4\nINE378 | CIRCUITOS II | INE377, INE377L | 4\nINE378L | LABORATORIO DE CIRCUITOS II | INE377, INE377L, INE378 | 1\nING212 | DINAMICA | ING216, ING216L | 4\nING212L | LABORATORIO DE DINAMICA | ING216, ING216L, ING212 | 1\nING231 | EXPERIMENTACION EN INGENIERIA | AHQ101 | 3\n\n# Trimestre 8\nCBM307 | ANALISIS NUMERICO | CBM203 | 4\nCBM307L | LABORATORIO DE ANALISIS NUMERICO | CBM203, CBM307 | 1\nEEE2X2 | ELECTIVAS DE ESTUDIOS ESPECIALIZADOS II | | 4\nIBI202 | CONSEJERIA PROFESIONAL INGENIERIA BIOMEDICA I | | 0\nIEC302 | ELECTRONICA I | INE378, INE378L | 4\nIEC302L | LABORATORIO DE ELECTRONICA I | IEC302 | 1\nING217 | RESISTENCIA DE MATERIALES | ING216, ING216L | 4\nING217L | LABORATORIO DE RESISTENCIA DE MATERIALES | ING216, ING216L, ING217 | 1\nING230 | INGENIERIA ECONOMICA | CBM202 | 4\n\n# Trimestre 9\nCBM302 | INFERENCIA ESTADISTICA | ING214 | 4\nIEC305 | SEÑALES Y SISTEMAS | IEC302, IEC302L | 4\nIEC305L | LABORATORIO DE SEÑALES Y SISTEMAS | IEC305 | 1\nIIN302 | GESTION HUMANA EN LA INDUSTRIA | CSH105 | 2\nING211 | FORMULACION DE PROYECTOS | ING230, ING231 | 4\nING215 | MECANICA DE FLUIDOS | ING216 | 4\nING215L | LABORATORIO DE MECANICA DE FLUIDOS | ING216, ING215 | 1\n\n# Trimestre 10\nIBI301 | INSTRUMENTACION BIOMEDICA | IEC305, IEC305L | 4\nIBI301L | LABORATORIO DE INSTRUMENTACION BIOMEDICA | IEC305, IEC305L, IBI301 | 1\nIBI303 | TECNICAS DE IMAGENES MEDICAS | IEC302, IEC302L | 4\nIBI304 | RADIODIAGNOSTICO Y TERAPIA | IEC302, IEC302L | 4\nIBI321 | TOPICOS DE ETICA Y BIOMEDICA | IBI319, IBI319L | 4\nISE2E1 | IMPACTO SOCIAL (ELECTIVA) | | 4\n\n# Trimestre 11\nIBI302 | SEÑALES MEDICAS | IBI301, IBI301L | 4\nIBI302L | LABORATORIO DE SEÑALES MEDICAS | IBI301, IBI301L, IBI302 | 1\nIBI322 | MICROBIOLOGIA EN LA INGENIERIA BIOMEDICA | IBI319, IBI320 | 4\nIBI322L | LABORATORIO MICROBIOLOGIA | IBI319L, IBI320L, IBI322 | 1\nING302 | GESTION DE PROYECTOS | ING211 | 4\nINI383 | CIENCIA E INGENIERIA DE LOS MATERIALES | ING217, ING217L | 4\nINI383L | LABORATORIO DE CIENCIA E INGENIERIA DE LOS MATERIALES | ING217, ING217L, INI383 | 1\n\n# Trimestre 12\nADM330 | COMPORTAMIENTO ORGANIZACIONAL | | 4\nIBI203 | CONSEJERIA PROFESIONAL INGENIERIA BIOMEDICA II | IBI202 | 0\nIBI305 | BIOMECANICA | IBI319, IBI319L | 4\nIBI305L | LABORATORIO DE BIOMECANICA | IBI319, IBI319L, IBI305 | 1\nIBI306 | IMAGENES MEDICAS | IBI303 | 4\nIBI306L | LABORATORIO DE IMAGENES MEDICAS | IBI303, IBI306 | 1\nIBI307 | SISTEMAS DE INFORMACION CLINICA | IBI301, IBI301L | 4\n\n# Trimestre 13\nIBI308 | INGENIERIA CLINICA Y DE GESTION | IBI301, IBI301L | 4\nIBI309 | BIOMATERIALES | INI383, INI383L | 4\nIBI310 | PRACTICAS EN EMPRESA | IBI306, IBI306L | 4\nIBI311 | PROYECTO DE INGENIERIA BIOMEDICA I | IBI306, IBI306L | 4\nIBI312 | SISTEMA DE AYUDA A LA DECISION MEDICA | IBI307 | 4\n\n# Trimestre 14\nEEP3X1 | ELECTIVAS DE ESTUDIOS PROFESIONALIZANTES I | | 4\nEEP3X2 | ELECTIVAS DE ESTUDIOS PROFESIONALIZANTES II | | 4\nEEP3X3 | ELECTIVAS DE ESTUDIOS PROFESIONALIZANTES III | | 4\nIBI313 | PROYECTO DE INGENIERIA BIOMEDICA II | IBI311 | 4\nINI379 | METROLOGIA | IBI301, IBI301L | 4`,
+  
+  IMC_2020: `# Trimestre 1\nAHC109 | REDACCION | | 4\nAHO102 | ORIENTACION ACADEMICA E INSTITUCIONAL | | 0\nCBA1X3 | VIDA EN EL MEDIO AMBIENTE | | 2\nCBM101 | ALGEBRA Y GEOMETRIA ANALITICA | | 5\nCSH112 | CIUDADANIA Y ETICA | | 2\nCSS102 | SER HUMANO Y SOCIEDAD | | 2\nEAA1X1 | ELECTIVAS DE AREAS ACADEMICAS I | | 2\nEAA1X2 | ELECTIVAS DE AREAS ACADEMICAS II | | 2\nIMC101 | SEMINARIO DE INGENIERIA MECATRONICA | | 0\nSH1103 | INGLES 01 (BASICO I) | | 0\n\n# Trimestre 2\nAHC110 | ARGUMENTACIÓN LINGÜÍSTICA | AHC109 | 4\nCBM102 | CALCULO DIFERENCIAL | CBM101 | 5\nEAA1X3 | ELECTIVAS DE AREAS ACADEMICAS III | | 2\nEAA1X4 | ELECTIVAS DE AREAS ACADEMICAS IV | | 2\nING102 | INTRODUCCION A LA PROGRAMACION | CBM101 | 2\nING102L | LABORATORIO DE INTRODUCCION A LA PROGRAMACION | CBM101, ING102 | 0\nING227 | GRAFICOS EN INGENIERIA | | 4\nING236L | LABORATORIO DE GRAFICOS EN INGENIERIA | ING227 | 1\nSH1104 | INGLES 02 (BASICO II) | SH1103 | 0\n\n# Trimestre 3\nCBF210 | FISICA MECANICA I | CBM201 | 4\nCBF210L | LABORATORIO DE FISICA MECANICA I | CBF210 | 1\nCBM201 | CALCULO INTEGRAL | CBM102 | 5\nIMC102 | PROGRAMA HANDS ON 1 | IMC101 | 0\nINM201 | DIBUJO MECANICO I | ING227, ING236L | 4\nINS213 | PROGRAMACION Y DISEÑO DE ALGORITMOS | ING102, ING102L | 4\nINS213L | LABORATORIO DE PROGRAMACION Y DISEÑO DE ALGORITMOS | ING102, ING102L, INS213 | 1\nSH1105 | INGLES 03 (INTERMEDIO I) | SH1104 | 0\n\n# Trimestre 4\nAHQ101 | QUEHACER CIENTIFICO | | 4\nCBF211 | FISICA MECANICA II | CBM201, CBF210, CBF210L | 4\nCBF211L | LABORATORIO DE FISICA MECANICA II | CBF210, CBF210L, CBM201, CBF211 | 1\nCBM202 | CALCULO VECTORIAL | CBM201 | 5\nCBQ207 | QUIMICA I | CBM102 | 4\nCBQ207L | LABORATORIO DE QUIMICA I | CBM102, CBQ207 | 1\nIMC1X1 | SEMINARIO ELECTIVO I | IMC101 | 0\nSH1106 | INGLES 04 (INTERMEDIO II) | SH1105 | 0\n\n# Trimestre 5\nCBF212 | FISICA ELECTRICA Y MAGNETICA | CBF211, CBF211L, CBM202 | 4\nCBF212L | LABORATORIO DE FISICA ELECTRICA Y MAGNETICA | CBF211, CBF211L, CBM202, CBF212 | 1\nCBM208 | ALGEBRA LINEAL | CBM202 | 5\nIMC103 | PROGRAMA HANDS ON 2 | IMC102 | 0\nIMC210 | CONSEJERÍA EN INGENIERÍA MECATRONICA I | | 0\nING216 | ESTATICA | CBF211, CBF211L | 4\nING216L | LABORATORIO DE ESTATICA | CBF211, CBF211L, ING216 | 1\nING229 | INTRODUCCION A LA CIENCIA DE MATERIALES | CBM201, CBQ207, CBQ207L | 4\nING229L | LABORATORIO DE INTRODUCCION A LA CIENCIA DE MATERIALES | CBM201, CBQ207, CBQ207L, ING229 | 1\nSH1107 | INGLES 05 (AVANZADO I) | SH1106 | 0\n\n# Trimestre 6\nCBM203 | ECUACIONES DIFERENCIALES | CBM208 | 5\nCSH113 | PENSAMIENTO CREATIVO | | 2\nIMC2X1 | SEMINARIO ELECTIVO II | IMC1X1 | 0\nING212 | DINAMICA | ING216, ING216L | 4\nING212L | LABORATORIO DE DINAMICA | ING216, ING216L, ING212 | 1\nING234 | MECANICA DE SOLIDOS DEFORMABLES | ING216, ING216L | 4\nING234L | LABORATORIO DE MECANICA DE SOLIDOS DEFORMABLES | ING216, ING216L, ING234 | 1\nSHI108 | INGLES 06 (AVANZADO II) | SH1107 | 0\n\n# Trimestre 7\nCBM307 | ANALISIS NUMERICO | CBM208 | 4\nCBM307L | LABORATORIO DE ANALISIS NUMERICO | CBM208, CBM307 | 1\nIMC204 | PROGRAMA HANDS ON 3 | IMC103 | 0\nINE377 | CIRCUITOS I | CBF212, CBF212L | 4\nINE377L | LABORATORIO DE CIRCUITOS I | CBF212, CBF212L, INE377 | 1\nING214 | ANALISIS DE DATOS EN INGENIERIA | CBM201 | 4\nINM305 | MECANISMOS | ING212, ING212L | 4\nINM396 | INGENIERIA ASISTIDA (CAE) I | | 1\n\n# Trimestre 8\nCBM311 | METODOS MATEMATICOS PARA INGENIEROS | CBM203 | 4\nCSH105 | PROYECTO INTEGRADOR DE ESTUDIOS GENERALES | | 2\nIMC2X2 | SEMINARIO ELECTIVO III | IMC2X1 | 0\nINE378 | CIRCUITOS II | INE377, INE377L | 4\nINE378L | LABORATORIO DE CIRCUITOS II | INE377, INE377L, INE378 | 1\nINM328 | MODELADO Y SIMULACION | INM305, CBM307, CBM307L, CBM311 | 3\nISE2E1 | IMPACTO SOCIAL (ELECTIVA) | | 4\n\n# Trimestre 9\nIEC301 | ELECTRONICA DIGITAL | INS213, INS213L, INE377, INE377L | 4\nIEC301L | LABORATORIO ELECTRONICA DIGITAL | INS213, INS213L, INE377, INE377L, IEC301 | 1\nIEC302 | ELECTRONICA I | INE378, INE378L | 4\nIEC302L | LABORATORIO DE ELECTRONICA I | INE378, INE378L, IEC302 | 1\nIMC205 | PROGRAMA HANDS ON 4 | IMC204 | 0\nIMC346 | CONSEJERÍA EN INGENIERÍA MECATRONICA II | IMC210 | 0\nING231 | EXPERIMENTACION EN INGENIERIA | ING214, AHQ101 | 3\nINM329 | DISEÑO DE ELEMENTOS DE MAQUINAS I | ING234, ING234L, INM305 | 4\nINM397 | INGENIERIA ASISTIDA (CAE) II | INM329 | 1\n\n# Trimestre 10\nIEC303 | ELECTRONICA II | IEC302, IEC302L | 4\nIEC303L | LABORATORIO DE ELECTRONICA II | IEC302, IEC302L, IEC303 | 1\nIEC304 | SISTEMAS DIGITALES Y MICROPROCESADORES | IEC301, IEC301L | 4\nIEC304L | LABORATORIO DE SISTEMAS DIGITALES Y MICROPROCESADORES | IEC301, IEC301L, IEC304 | 1\nIMC3X1 | SEMINARIO ELECTIVO IV | IMC2X2 | 0\nINI383 | CIENCIA E INGENIERIA DE LOS MATERIALES | ING229, ING229L, ING234, ING234L | 4\nINI383L | LABORATORIO DE CIENCIA E INGENIERIA DE LOS MATERIALES | ING229, ING229L, ING234, ING234L, INI383 | 1\nINM336 | DISEÑO DE ELEMENTOS DE MAQUINAS II | INM329 | 4\n\n# Trimestre 11\nIEC312 | DISEÑO DE SISTEMAS DE CONTROL | INM328, IEC304, IEC304L | 4\nIEC312L | LABORATORIO DE SISTEMAS DE CONTROL | INM328, IEC304, IEC304L, IEC312 | 1\nIMC328 | PROGRAMA HANDS ON 5 | IMC205 | 0\nING230 | INGENIERIA ECONOMICA | CBM202 | 4\nINM300 | TERMODINAMICA I | ING212 | 4\nINM376 | PROCESOS INDUSTRIALES I | INI383, INI383L | 4\nINM376L | LABORATORIO DE PROCESOS INDUSTRIALES I | INI383, INI383L, INM376 | 1\n\n# Trimestre 12\nELE310 | APLICACIÓN DE DISPOSITIVOS ELÉCTRICOS | INE378, INE378L | 3\nELE310L | LABORATORIO DE APLICACIÓN DE DISPOSITIVOS ELÉCTRICOS | INE378, INE378L, ELE310 | 1\nIEC315 | MACHINE LEARNING | ING214, IEC312, IEC312L | 4\nIEC315L | LABORATORIO MACHINE LEARNING | ING214, IEC312, IEC312L, IEC315 | 1\nIMC343 | DISEÑO Y MANUFACTURA ASISTIDA POR COMPUTADORA | INM376, INM376L | 3\nIMC343L | LABORATORIO DE DISEÑO Y MANUFACTURA ASISTIDA POR COMPUTADORA | INM376, INM376L, IMC343 | 1\nINL354 | ELECTRONICA DE POTENCIA | IEC312, IEC312L | 4\nINL354L | LABORATORIO DE ELECTRONICA DE POTENCIA | IEC312, IEC312L, INL354 | 1\n\n# Trimestre 13\nEEP3X1 | ELECTIVAS DE ESTUDIOS PROFESIONALIZANTES I | | 0\nIMC330 | DISEÑO DE SISTEMAS MECATRONICOS | IMC343, IMC343L, IMC333 | 4\nIMC330L | LABORATORIO DE DISEÑO DE SISTEMAS MECATRONICOS | IMC343, IMC343L, IMC330 | 1\nIMC331 | INSTRUMENTACION INDUSTRIAL | INE377, INE377L | 4\nIMC331L | LABORATORIO DE INSTRUMENTACION INDUSTRIAL | INE377, INE377L, IMC331 | 1\nIMC333 | DISEÑO Y PROGRAMACION DE CONTROLES | IEC303, IEC303L, IEC315, IEC315L | 4\nIMC333L | LABORATORIO DE DISEÑO Y PROGRAMACION DE CONTROLES | IEC303, IEC303L, IEC315, IEC315L, IMC333 | 1\nIMC337 | PROGRAMA HANDS ON 6 | IMC328 | 0\n\n# Trimestre 14\nEEP3X2 | ELECTIVAS DE ESTUDIOS PROFESIONALIZANTES II | | 0\nIMC319 | PROYECTO INGENIERIA MECATRONICA I | IMC330 | 3\nIMC332 | CIRCUITOS NEUMATICOS E HIDRAULICOS | INE377, INE377L | 4\nIMC332L | LABORATORIO DE CIRCUITOS NEUMATICOS E HIDRAULICOS | INE377, INE377L, IMC332 | 1\nIMC334 | TOURS INDUSTRIAL | | 0\nIMC344 | SISTEMAS PARA ENSAMBLE AUTOMATIZADO | IMC333, IMC333L | 3\n\n# Trimestre 15\nEEP3X3 | ELECTIVAS DE ESTUDIOS PROFESIONALIZANTES III | | 0\nIMC309 | PROYECTO DE INGENIERIA MECATRONICA II | IMC319 | 3\nIMC335 | ROBOTICA INDUSTRIAL | IMC333, IMC333L | 4\nIMC335L | LABORATORIO DE ROBOTICA INDUSTRIAL | IMC333, IMC333L, IMC335 | 1\nIMC336 | CONTROLADORES LOGICOS PROGRAMABLES (PLC) | IMC333, IMC333L | 4\nIMC336L | LABORATORIO CONTROLADORES LOGICOS PROGRAMABLES | IMC333, IMC333L, IMC336 | 1\nIMC338 | PROGRAMA HANDS ON 7 | IMC337 | 0\nIMC345 | MANTENIMIENTO CENTRADO EN FIABILIDAD (RCM) | | 3`,
+  
+  ELE_2020: `# Trimestre 1\nAHC109 | REDACCION | | 4\nAHO102 | ORIENTACION ACADEMICA E INSTITUCIONAL | | 0\nCBA1X3 | VIDA EN EL MEDIO AMBIENTE | | 2\nCBM101 | ALGEBRA Y GEOMETRIA ANALITICA | | 5\nCSH112 | CIUDADANIA Y ETICA | | 2\nEAA1X1 | ELECTIVAS DE AREAS ACADEMICAS I | | 2\nINE203 | INTRODUCCION A LA INGENIERIA ELECTRICA | | 2\nSHI103 | INGLES 01 (BASICO I) | | 0\n\n# Trimestre 2\nAHC110 | RAZONAMIENTO Y ARGUMENTACION | AHC109 | 4\nCBM102 | CALCULO DIFERENCIAL | CBM101 | 5\nCSS102 | SER HUMANO Y SOCIEDAD | | 2\nEAA1X2 | ELECTIVAS DE AREAS ACADEMICAS II | | 2\nING102 | INTRODUCCION A LA PROGRAMACION | CBM101 | 2\nING102L | LABORATORIO DE INTRODUCCION A LA PROGRAMACION | CBM101, ING102 | 0\nING227 | GRAFICOS EN INGENIERIA | | 4\nING227L | LABORATORIO DE GRAFICOS EN INGENIERIA | ING227 | 1\nSH1104 | INGLES 02 (BASICO II) | SHI103 | 0\n\n# Trimestre 3\nCBF210 | FISICA MECANICA I | | 4\nCBF210L | LABORATORIO DE FISICA MECANICA I | CBF210 | 1\nCBM201 | CALCULO INTEGRAL | CBM102 | 5\nCBQ207 | QUIMICA I | CBM102 | 4\nCBQ207L | LABORATORIO DE QUIMICA I | CBM102, CBQ207 | 1\nEAA1X3 | ELECTIVAS DE AREAS ACADEMICAS III | | 2\nINE204 | CONSEGERIA INGENIERIA ELECTRICA | | 0\nING228 | HOJA DE CALCULO PARA INGENIEROS | ING102, ING102L | 1\nSH1105 | INGLES 03 (INTERMEDIO I) | SH1104 | 0\n\n# Trimestre 4\nAHQ101 | QUEHACER CIENTIFICO | | 4\nCBF211 | FISICA MECANICA II | CBM201, CBF210, CBF210L | 4\nCBF211L | LABORATORIO DE FISICA MECANICA II | CBM201, CBF210, CBF210L, CBF211 | 1\nCBM202 | CALCULO VECTORIAL | CBM201, INE204 | 5\nCSH113 | PENSAMIENTO CREATIVO | | 2\nING229 | INTRODUCCION A LA CIENCIA DE MATERIALES | CBQ207, CBQ207L | 4\nING229L | LABORATORIO DE INTRODUCCION A LA CIENCIA DE MATERIALES | CBQ207, CBQ207L, ING229 | 1\nSH1106 | INGLES 04 (INTERMEDIO II) | SH1105 | 0\n\n# Trimestre 5\nCBF212 | FISICA ELECTRICA Y MAGNETICA | CBF211, CBF211L, CBM202 | 4\nCBF212L | LABORATORIO DE FISICA ELECTRICA Y MAGNETICA | CBF211, CBF211L, CBM202, CBF212 | 1\nCBM208 | ALGEBRA LINEAL | CBM202 | 5\nCBM220 | ESTADISTICA APLICADA A LA INGENIERIA | CBM201 | 4\nEAA1X4 | ELECTIVAS DE AREAS ACADEMICAS IV | | 2\nINS213 | PROGRAMACION Y DISEÑO DE ALGORITMOS | CBM201 | 4\nINS213L | LABORATORIO DE PROGRAMACION Y DISEÑO DE ALGORITMOS | CBM201, INS213 | 1\nSH1107 | INGLES 05 (AVANZADO I) | SH1106 | 0\n\n# Trimestre 6\nCBM203 | ECUACIONES DIFERENCIALES | CBM208 | 5\nCSH105 | PROYECTO INTEGRADOR DE ESTUDIOS GENERALES | | 2\nECO203 | INTRODUCCION A LA ECONOMIA | CBM208 | 4\nEFE2X1 | ELECTIVAS DE AREAS ACADEMICAS I CFE | | 0\nING205 | ESTATICA | CBF211, CBF211L | 4\nINS218 | LABORATORIO DE PROGRAMACION Y DISEÑO (PHYTON) | INS213, INS213L | 1\nSHI108 | INGLES 06 (AVANZADO II) | SH1107 | 0\n\n# Trimestre 7\nCBF213 | FISICA ELECTROMAGNETICA Y OPTICA | CBF212, CBF212L | 4\nCBF213L | LABORATORIO DE FISICA ELECTROMAGNETICA Y OPTICA | CBF212, CBF212L, CBF213 | 1\nCBM311 | METODOS MATEMATICOS PARA INGENIEROS | CBM203 | 4\nELE301 | HERRAMIENTAS INFORMATICAS PARA INGENIERIAS | INS213, INS213L | 2\nELE301L | LABORATORIO DE HERRAMIENTAS INFORMATICAS | INS213, INS213L, ELE301 | 1\nINE377 | CIRCUITOS I | CBF212, CBF212L | 4\nINE377L | LABORATORIO DE CIRCUITOS I | CBF212, CBF212L, INE377 | 1\nING230 | INGENIERIA ECONOMICA | CBM202 | 4\n\n# Trimestre 8\nELE302 | APLICACION NUMERICA PARA INGENIERIA | CBM203 | 4\nELE302L | LABORATORIO DE APLICACION NUMERICA | CBM203, ELE302 | 1\nINE336 | CAMPOS ELECTROMAGNETICOS | CBF213, CBF213L | 4\nINE378 | CIRCUITOS II | CBM203, INE377, INE377L | 4\nINE378L | LABORATORIO DE CIRCUITOS II | CBM203, INE377, INE377L, INE378 | 1\nING231 | EXPERIMENTACION EN INGENIERIA | AHQ101, CBM220 | 3\n\n# Trimestre 9\nELE303 | DISEÑO DE INSTALACIONES ELECTRICAS | INE378, INE378L | 4\nELE303L | LABORATORIO DE DISEÑO DE INSTALACIONES | INE378, INE378L, ELE303 | 1\nINE383 | LINEAS DE TRANSMISION | INE378, INE378L, INE336 | 4\nINE383L | LABORATORIO DE LINEAS DE TRANSMISION | INE378, INE378L, INE336, INE383 | 1\nINE392 | COMUNICACIONES | INE378, INE378L, INE336 | 4\nINE392L | LABORATORIO DE COMUNICACIONES | INE378, INE378L, INE336, INE392 | 1\nINL370 | FUNDAMENTOS DE ELECTRONICA | INE378, INE378L | 4\nINL370L | LABORATORIO DE FUNDAMENTOS DE ELECTRONICA | INE378, INE378L, INL370 | 1\n\n# Trimestre 10\nELE304 | COMUNICACIONES EN SISTEMAS ELECTRICOS | INE392, INL370, INE392L, INL370L | 4\nELE304L | LABORATORIO DE COMUNICACIONES EN SISTEMAS ELECTRICOS | INE392, INL370, INE392L, INL370L, ELE304 | 1\nELE305 | EFICIENCIA Y AUDITORIA ELECTRICA | INE377, INE377L | 3\nINE380 | MAQUINAS ELECTRICAS I | INE336, INE378, INE378L | 4\nINE380L | LABORATORIO DE MAQUINAS ELECTRICAS I | INE336, INE378, INE378L, INE380 | 1\nING211 | FORMULACION DE PROYECTOS | | 4\nINM300 | TERMODINAMICA I | CBF211, CBF211L | 4\n\n# Trimestre 11\nINE366 | SUBESTACIONES ELECTRICAS | ELE304, ELE304L, INE380, INE380L | 4\nINE385 | MAQUINAS ELECTRICAS II | INE380, INE380L | 4\nINE385L | LABORATORIO DE MAQUINAS ELECTRICAS II | INE380, INE380L, INE385 | 1\nINE386 | SISTEMAS DE CONTROL I | CBM311, INL370, INL370L | 4\nINE386L | LABORATORIO DE SISTEMAS DE CONTROL I | CBM311, INL370, INL370L, INE386 | 1\nINE387 | SISTEMAS DE POTENCIA I | INE383, INE383L, INL370, INL370L, INE380, INE380L | 4\nINE387L | LABORATORIO DE SISTEMAS DE POTENCIA I | INE383, INE383L, INL370, INL370L, INE380, INE380L, INE387 | 1\nINE393 | ASEGURAMIENTO Y GESTION DE CALIDAD | ING211 | 2\n\n# Trimestre 12\nEFP3X1 | ELECTIVA PROFESIONAL | | 0\nELE306 | TALLER GESTION DE PROYECTOS ELECTRICOS | ING211 | 2\nINE365 | PLANTAS DE POTENCIA | INM300, INE385, INE385L | 4\nINE391 | SISTEMAS DE POTENCIA II | INE387, INE387L | 4\nINE391L | LABORATORIO DE SISTEMAS DE POTENCIA II | INE387, INE387L, INE391 | 1\nINL354 | ELECTRONICA DE POTENCIA | INL370, INL370L, INE386, INE386L | 4\nINL354L | LABORATORIO DE ELECTRONICA DE POTENCIA | INL370, INL370L, INE386, INE386L, INL354 | 1\n\n# Trimestre 13\nEFP3X2 | ELECTIVA PROFESIONAL | | 0\nELE307 | PRACTICA INVESTIGATIVA ELECTRICA IΙ | ELE306, INE391 | 0\nINE388 | AUTOMATIZACION, CONTROL E INSTRUMENTACION | INE386, INE386L | 4\nINE388L | LABORATORIO DE AUTOMATIZACION, CONTROL E INSTRUMENTACION | INE386, INE386L, INE388 | 1\nINE390 | MERCADOS ELECTRICOS | ELE304, ELE304L, ECO203, INE387L | 4\nINI383 | CIENCIA E INGENIERIA DE LOS MATERIALES | ING229, ING229L | 4\nINI383L | LABORATORIO DE CIENCIA E INGENIERIA DE LOS MATERIALES | ING229, ING229L, INI383 | 1\n\n# Trimestre 14\nEFP3X3 | ELECTIVA PROFESIONAL | | 4\nELE308 | PRACTICA INVESTIGATIVA ELECTRICA II | ELE307 | 4\nELE309 | SMARTGRID Y MOVILIDAD ELECTRICA | ELE304, ELE304L | 2\nINE384 | SISTEMAS DE ENERGIAS RENOVABLES I | INE385, INE385L | 4\nINE384L | LABORATORIO DE SISTEMAS DE ENERGIAS RENOVABLES I | INE385, INE385L, INE384 | 1`,
+  
+  IEC_2020: `# Trimestre 1\nAHC109 | REDACCION | | 4\nAHO102 | ORIENTACION ACADEMICA E INSTITUCIONAL | | 0\nCBA1X3 | VIDA EN EL MEDIO AMBIENTE | | 2\nCBM101 | ALGEBRA Y GEOMETRIA ANALITICA | | 5\nCSH112 | CIUDADANIA Y ETICA | | 2\nEAA1X1 | ELECTIVAS DE AREAS ACADEMICAS I | | 2\nIEC201 | TECNOLOGIAS DE LA INFORMACION Y DE COMUNICACIONES | | 2\nIEC201L | LABORATORIO DE TECNOLOGIAS DE LA INFORMACION Y DE COMUNICACIONES | IEC201 | 1\nSHI103 | INGLES 01 (BASICO I) | | 0\n\n# Trimestre 2\nAHC110 | RAZONAMIENTO Y ARGUMENTACION | AHC109 | 4\nCBM102 | CALCULO DIFERENCIAL | CBM101 | 5\nCSS102 | SER HUMANO Y SOCIEDAD | | 2\nIEC202 | TECNOLOGIAS DE LA ELECTRONICA | | 2\nING102 | INTRODUCCION A LA PROGRAMACION | CBM101 | 2\nING102L | LABORATORIO DE INTRODUCCION A LA PROGRAMACION | CBM101, ING102 | 0\nING227 | GRAFICOS EN INGENIERIA | | 4\nING227L | LABORATORIO DE GRAFICOS EN INGENIERIA | ING227 | 1\nSHI104 | INGLES 02 (BASICO II) | SHI103 | 0\n\n# Trimestre 3\nCBF210 | FISICA MECANICA I | CBM201 | 4\nCBF210L | LABORATORIO DE FISICA MECANICA I | CBF210 | 1\nCBM201 | CALCULO INTEGRAL | CBM102 | 5\nEAA1X2 | ELECTIVAS DE AREAS ACADEMICAS II | | 2\nEAA1X3 | ELECTIVAS DE AREAS ACADEMICAS III | | 2\nING228 | HOJA DE CALCULO PARA INGENIEROS | ING102, ING102L | 1\nINS213 | PROGRAMACION Y DISEÑO DE ALGORITMOS | ING102, ING102L | 4\nINS213L | LABORATORIO DE PROGRAMACION Y DISEÑO DE ALGORITMOS | ING102, ING102L, INS213 | 1\nSHI105 | INGLES 03 (INTERMEDIO I) | SHI104 | 0\n\n# Trimestre 4\nAHQ101 | QUEHACER CIENTIFICO | | 4\nCBF212 | FISICA ELECTRICA Y MAGNETICA | CBF210, CBF210L | 4\nCBF212L | LABORATORIO DE FISICA ELECTRICA Y MAGNETICA | CBF212 | 1\nCBM202 | CALCULO VECTORIAL | CBM201 | 5\nCSH113 | PENSAMIENTO CREATIVO | | 2\nEAA1X4 | ELECTIVAS DE AREAS ACADEMICAS IV | | 2\nIEC203 | PRACTICA DE LA ELECTRONICA | | 1\nIEC204 | CONSEJERIA ING. ELECTRONICA Y DE COMUNICACIONES I | | 0\nINS218 | LABORATORIO DE PROGRAMACION (PHYTON) | INS213, INS213L | 1\nSH1106 | INGLES 04 (INTERMEDIO II) | SHI105 | 0\n\n# Trimestre 5\nCBF211 | FISICA MECANICA II | CBF210, CBF210L, CBM201 | 4\nCBF211L | LABORATORIO DE FISICA MECANICA II | CBF210, CBF210L, CBM201, CBF211 | 1\nCBM208 | ALGEBRA LINEAL | CBM202 | 5\nIEC301 | ELECTRONICA DIGITAL | INS213, INS213L, CBF212, CBF212L | 4\nIEC301L | LABORATORIO ELECTRONICA DIGITAL | INS213, INS213L, CBF212, CBF212L, IEC301 | 1\nINE377 | CIRCUITOS I | CBF212, CBF212L | 4\nINE377L | LABORATORIO DE CIRCUITOS I | CBF212, CBF212L, INE377 | 1\nSH1107 | INGLES 05 (AVANZADO I) | SH1106 | 0\n\n# Trimestre 6\nCBM203 | ECUACIONES DIFERENCIALES | CBM208 | 5\nCBM206 | PROBABILIDAD Y ESTADISTICA | CBM201 | 4\nCSH105 | PROYECTO INTEGRADOR DE ESTUDIOS GENERALES | | 2\nIEC205 | TECNOLOGIAS DE COMUNICACIONES | | 2\nIEC206 | PLANIFICACION CARRERA PROFESIONAL | | 2\nINE378 | CIRCUITOS II | INE377, INE377L, CBM203 | 4\nINE378L | LABORATORIO DE CIRCUITOS II | INE377, INE377L, CBM203, INE378 | 1\nSHI108 | INGLES 06 (AVANZADO II) | SH1107 | 0\n\n# Trimestre 7\nCBF213 | FISICA ELECTROMAGNETICA Y OPTICA | CBF212, CBF212L | 4\nCBF213L | LABORATORIO DE FISICA ELECTROMAGNETICA Y OPTICA | CBF212, CBF212L, CBF213 | 1\nCBM311 | METODOS MATEMATICOS PARA INGENIEROS | CBM203 | 4\nEFE2X1 | ELECTIVAS DE AREAS ACADEMICAS I CFE | | 0\nIEC302 | ELECTRONICA I | INE378, INE378L | 4\nIEC302L | LABORATORIO DE ELECTRONICA I | INE378, INE378L, IEC302 | 1\nING231 | EXPERIMENTACION EN INGENIERIA | AHQ101 | 3\n\n# Trimestre 8\nIEC303 | ELECTRONICA II | IEC302, IEC302L | 4\nIEC303L | LABORATORIO DE ELECTRONICA II | IEC302, IEC302L, IEC303 | 1\nIEC304 | SISTEMAS DIGITALES Y MICROPROCESADORES | IEC301, IEC301L | 4\nIEC304L | LABORATORIO DE SISTEMAS DIGITALES Y MICROPROCESADORES | IEC301, IEC301L, IEC304 | 1\nIEC305 | SEÑALES Y SISTEMAS | CBM311, IEC302, IEC302L | 4\nIEC305L | LABORATORIO DE SEÑALES Y SISTEMAS | CBM311, IEC302, IEC302L, IEC305 | 1\nINS376 | COMUNICACION DE DATOS I | INS213, INS213L | 4\nINS376L | LABORATORIO COMUNICACION DE DATOS I | INS213, INS213L, INS376 | 1\n\n# Trimestre 9\nIEC306 | DISEÑO DE CIRCUITOS ELECTRONICOS | IEC303, IEC303L | 1\nIEC306L | LABORATORIO DE DISEÑO DE CIRCUITOS ELECTRONICOS | IEC303, IEC303L, IEC306 | 1\nIEC307 | SISTEMAS DE COMUNICACIONES | IEC305, IEC305L | 4\nIEC307L | LABORATORIO DE SISTEMAS DE COMUNICACIONES | IEC305, IEC305L, IEC307 | 1\nIEC308 | ELECTROMAGNETISMO Y ANTENAS | CBF213, CBF213L | 4\nINS379 | COMUNICACION DE DATOS II | INS376, INS376L | 4\nINS379L | LABORATORIO COMUNICACION DE DATOS II | INS376, INS376L, INS379 | 1\n\n# Trimestre 10\nCBQ207 | QUIMICA I | CBM102 | 4\nCBQ207L | LABORATORIO DE QUIMICA I | CBM102, CBQ207 | 1\nEFE2X2 | ELECTIVAS DE AREAS ACADEMICAS II CFE | | 0\nIEC309 | COMUNICACIONES DIGITALES | IEC307, IEC307L, CBM206 | 4\nIEC309L | LABORATORIO COMUNICACIONES DIGITALES | IEC307, IEC307L, CBM206, IEC309 | 1\nIEC310 | TRANSMISION DE SEÑALES DE RADIOFRECUENCIA | IEC308 | 4\nIEC310L | LABORATORIO DE TRANSMISION DE SEÑALES | IEC308, IEC310 | 1\n\n# Trimestre 11\nIEC311 | COMUNICACIONES MOVILES | IEC309, IEC309L, IEC310, IEC310L | 4\nIEC311L | LABORATORIO COMUNICACIONES MOVILES | IEC309, IEC309L, IEC310, IEC310L, IEC311 | 1\nIEC312 | DISEÑO DE SISTEMAS DE CONTROL | IEC305, IEC305L, CBM311 | 4\nIEC312L | LABORATORIO DE SISTEMAS DE CONTROL | IEC305, IEC305L, CBM311, IEC312 | 1\nIEC313 | CONSEJERIA ING. ELECTRONICA II | IEC204 | 0\nIMC331 | INSTRUMENTACION INDUSTRIAL | INE377, INE377L | 4\nIMC331L | LABORATORIO DE INSTRUMENTACION INDUSTRIAL | INE377, INE377L, IMC331 | 1\nING230 | INGENIERIA ECONOMICA | CBM202 | 4\n\n# Trimestre 12\nIDS202 | TECNOLOGIA DE OBJETOS | INS213, INS213L | 4\nIDS202L | LABORATORIO TECNOLOGIA DE OBJETOS | INS213, INS213L, IDS202 | 1\nIEC207 | FORMULACION Y GESTION DE PROYECTOS TECNOLOGICOS | ING230, ING231 | 4\nIEC207L | LABORATORIO DE GESTION DE PROYECTOS | ING230, ING231, IEC207 | 1\nIEC314 | SISTEMAS EMBEBIDOS | IEC304, IEC304L | 4\nIEC314L | LABORATORIO SISTEMAS EMBEBIDOS | IEC304, IEC304L, IEC314 | 1\nIEC315 | MACHINE LEARNING | CBM311 | 4\nIEC315L | LABORATORIO MACHINE LEARNING | CBM311, IEC315 | 1\n\n# Trimestre 13\nEFP3X1 | ELECTIVA PROFESIONAL | | 0\nIEC316 | TOPICOS PROFESIONALES Y LEGALES | IEC207, IEC207L | 4\nIEC317 | ANTEPROYECTO DE GRADO | IEC207, IEC207L | 4\nIMC336 | CONTROLADORES LOGICOS PROGRAMABLES (PLC) | IMC331, IMC331L | 4\nIMC336L | LABORATORIO CONTROLADORES LOGICOS PROGRAMABLES | IMC331, IMC331L, IMC336 | 1\n\n# Trimestre 14\nADM315 | ADMINISTRACION Y GESTION EMPRESARIAL | | 4\nEFP3X2 | ELECTIVA PROFESIONAL | | 0\nEFP3X3 | ELECTIVA PROFESIONAL | | 4\nIEC318 | PROYECTO DE GRADO | IEC317 | 4`
+};
+
+// ==========================================
+// ESCUDO DE ERRORES (Error Boundary)
+// ==========================================
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null, errorInfo: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, errorInfo) { console.error("Error capturado:", error, errorInfo); this.setState({ errorInfo }); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '40px', background: '#fee2e2', color: '#991b1b', height: '100vh', fontFamily: 'sans-serif' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>¡Ups! Algo se rompió 😢</h1>
+          <p>Por favor, pásame este mensaje de error para solucionarlo:</p>
+          <pre style={{ background: '#fef2f2', padding: '15px', borderRadius: '8px', overflowX: 'auto', border: '1px solid #fca5a5' }}>
+            {this.state.error && this.state.error.toString()}<br/>
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </pre>
+          <button 
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            style={{ marginTop: '20px', padding: '10px 20px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            Borrar Memoria Dañada y Reiniciar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ==========================================
+// MOTOR PRINCIPAL
+// ==========================================
+function FlowApp() {
+  const [baseGraph, setBaseGraph] = useState({ nodes: [], edges: [], subjectDict: {}, trimestersList: [] });
+  const [inputText, setInputText] = useState(PRELOADED_PENSUMS.IBM_2020);
+  
+  const [passedIds, setPassedIds] = useState(new Set());
+  const [isStrictMode, setIsStrictMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isCompact, setIsCompact] = useState(false); 
+  
+  const [sidebarWidth, setSidebarWidth] = useState(460);
+  const isResizing = useRef(false);
+  const [activeTab, setActiveTab] = useState('map'); 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [highlightedNodeId, setHighlightedNodeId] = useState(null);
+  const [focusModeId, setFocusModeId] = useState(null);
+  
+  const [isSimulatorMode, setIsSimulatorMode] = useState(false);
+  const [simulatorCart, setSimulatorCart] = useState(new Set());
+  const [gpaTerms, setGpaTerms] = useState([]); 
+  const [activeGpaTermId, setActiveGpaTermId] = useState(null); 
+  
+  const [targetGpa, setTargetGpa] = useState("3.80");
+  const [goalSubjects, setGoalSubjects] = useState(new Set()); 
+  
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+  const rfInstance = useReactFlow();
+
+  // --- PERSISTENCIA ---
+  useEffect(() => {
+    try {
+      const sText = localStorage.getItem('pensum_text');
+      const sPassed = localStorage.getItem('pensum_passed');
+      const sStrict = localStorage.getItem('pensum_strict');
+      const sGpaTerms = localStorage.getItem('pensum_gpa');
+      const sDark = localStorage.getItem('pensum_dark');
+      const sCompact = localStorage.getItem('pensum_compact');
+      
+      if (sText) { setInputText(sText); parseTextToGraph(sText); }
+      else { parseTextToGraph(PRELOADED_PENSUMS.IBM_2020); }
+
+      if (sPassed) setPassedIds(new Set(JSON.parse(sPassed)));
+      if (sStrict !== null) setIsStrictMode(JSON.parse(sStrict));
+      if (sDark !== null) setIsDarkMode(JSON.parse(sDark));
+      if (sCompact !== null) setIsCompact(JSON.parse(sCompact));
+      if (sGpaTerms) {
+        const parsed = JSON.parse(sGpaTerms);
+        if (Array.isArray(parsed)) setGpaTerms(parsed.map(t => ({...t, subjects: t.subjects || []})));
+      }
+    } catch (error) {
+      console.error("Limpiando caché por seguridad", error);
+      localStorage.removeItem('pensum_gpa');
+    }
+  }, []);
+
+  const saveGpaTerms = (newTerms) => { setGpaTerms(newTerms); localStorage.setItem('pensum_gpa', JSON.stringify(newTerms)); };
+  const toggleDarkMode = () => { setIsDarkMode(p => { const v = !p; localStorage.setItem('pensum_dark', v); return v; }); };
+  const toggleCompactMode = () => { setIsCompact(p => { const v = !p; localStorage.setItem('pensum_compact', v); return v; }); };
+
+  const startResizing = useCallback(() => { isResizing.current = true; }, []);
+  const stopResizing = useCallback(() => { isResizing.current = false; }, []);
+  const resize = useCallback((mouseMoveEvent) => {
+    if (isResizing.current) { setSidebarWidth(Math.max(350, Math.min(800, mouseMoveEvent.clientX))); }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", resize); window.addEventListener("mouseup", stopResizing);
+    return () => { window.removeEventListener("mousemove", resize); window.removeEventListener("mouseup", stopResizing); };
+  }, [resize, stopResizing]);
+
+  const handleToggleSubject = useCallback((id, checked) => {
+    setPassedIds(prev => { const next = new Set(prev); checked ? next.add(id) : next.delete(id); localStorage.setItem('pensum_passed', JSON.stringify([...next])); return next; });
+    setSimulatorCart(prev => { const next = new Set(prev); next.delete(id); return next; }); 
+    setGoalSubjects(prev => { const next = new Set(prev); next.delete(id); return next; }); 
+  }, []);
+
+  const handleToggleMultiple = useCallback((ids, checked) => {
+    setPassedIds(prev => { const next = new Set(prev); ids.forEach(id => checked ? next.add(id) : next.delete(id)); localStorage.setItem('pensum_passed', JSON.stringify([...next])); return next; });
+  }, []);
+
+  const handleDoubleClick = useCallback((id) => { setFocusModeId(prev => prev === id ? null : id); }, []);
+
+  const resetProgress = () => {
+    if (window.confirm("¿Borrar todo tu progreso del mapa y notas?")) {
+      setPassedIds(new Set()); setGpaTerms([]); setSimulatorCart(new Set()); setGoalSubjects(new Set());
+      localStorage.removeItem('pensum_passed'); localStorage.removeItem('pensum_gpa');
+    }
+  };
+
+  const handleSearchClick = () => {
+    const term = searchTerm.toLowerCase();
+    const matches = nodes.filter(n => n.type === 'subject' && (n.data.name.toLowerCase().includes(term) || n.data.code.toLowerCase().includes(term)));
+    if (matches.length === 1 && rfInstance) {
+      rfInstance.fitView({ nodes: [{ id: matches[0].id }], duration: 800, maxZoom: 1.2 });
+    }
+  };
+
+  const parseTextToGraph = (text) => {
+    localStorage.setItem('pensum_text', text);
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l !== '');
+    const bNodes = []; const rawEdges = []; const dict = {};
+    let tIndex = 0; let currentTId = null; const trimesters = [];
+    
+    lines.forEach(line => {
+      if (line.startsWith('#')) {
+        tIndex++; currentTId = `Trimestre-${tIndex}`;
+        trimesters.push({ id: currentTId, label: line.replace('#', '').trim(), subjects: [], index: tIndex });
+      } else if (currentTId) {
+        const parts = line.split('|').map(s => s.trim());
+        if (parts.length >= 2) {
+          const prereqs = parts[2] ? parts[2].split(',').map(s => s.trim()).filter(s => s !== '') : [];
+          const credits = parseInt(parts[3]) || 0;
+          const subjData = { code: parts[0], name: parts[1], prereqs, credits };
+          trimesters[trimesters.length - 1].subjects.push(subjData);
+          dict[parts[0]] = subjData;
+        }
+      }
+    });
+
+    trimesters.forEach(tri => {
+      bNodes.push({ id: tri.id, type: 'trimester', data: { label: tri.label, subjectIds: tri.subjects.map(s => s.code), isDarkMode, onToggleAll: (checked) => handleToggleMultiple(tri.subjects.map(s => s.code), checked) }, position: { x: (tri.index - 1) * 460, y: 0 }, zIndex: -1, style: { width: 280, height: 100 } });
+      tri.subjects.forEach(subj => {
+        bNodes.push({ id: subj.code, type: 'subject', data: { code: subj.code, name: subj.name, credits: subj.credits, prereqs: subj.prereqs }, parentNode: tri.id, extent: 'parent', zIndex: 10, position: { x: 25, y: 0 }, });
+        subj.prereqs.forEach(pr => { rawEdges.push({ source: pr, target: subj.code }); });
+      });
+    });
+
+    const adj = {}; rawEdges.forEach(e => { if (!adj[e.source]) adj[e.source] = []; adj[e.source].push(e.target); });
+    const cleanEdges = rawEdges.filter(e => {
+      let q = [e.source]; let v = new Set([e.source]); let found = false;
+      while (q.length > 0) {
+        let curr = q.shift();
+        for (let n of (adj[curr] || [])) {
+          if (curr === e.source && n === e.target) continue;
+          if (n === e.target) { found = true; break; }
+          if (!v.has(n)) { v.add(n); q.push(n); }
+        }
+        if (found) break;
+      }
+      return !found; 
+    });
+
+    const bEdges = cleanEdges.map(e => {
+      const isLabCoreq = e.target.endsWith('L') && e.target.replace('L', '') === e.source;
+      return { id: `e-${e.source}-${e.target}`, source: e.source, target: e.target, type: 'customArch', markerEnd: { type: MarkerType.ArrowClosed }, style: isLabCoreq ? { strokeDasharray: '5,5' } : {} };
+    });
+    setBaseGraph({ nodes: bNodes, edges: bEdges, subjectDict: dict, trimestersList: trimesters });
+  };
+
+  const onNodeClick = useCallback((_, clickedNode) => {
+    if (clickedNode.type === 'trimester') return;
+    
+    if (activeTab === 'goal') {
+      if (!passedIds.has(clickedNode.id)) {
+        setGoalSubjects(prev => { const next = new Set(prev); next.has(clickedNode.id) ? next.delete(clickedNode.id) : next.add(clickedNode.id); return next; });
+      }
+      return;
+    }
+
+    if (isSimulatorMode && activeTab === 'map') {
+      const nData = baseGraph.subjectDict[clickedNode.id];
+      const isEligible = !passedIds.has(clickedNode.id) && (nData?.prereqs || []).every(pr => passedIds.has(pr));
+      if (isEligible) {
+        setSimulatorCart(prev => { const next = new Set(prev); next.has(clickedNode.id) ? next.delete(clickedNode.id) : next.add(clickedNode.id); return next; });
+      }
+      return;
+    }
+
+    if (activeTab === 'gpa' && activeGpaTermId) {
+      setGpaTerms(prev => {
+        const newTerms = prev.map(t => {
+          if (t.id === activeGpaTermId && !t.isManual) {
+            const exists = (t.subjects || []).find(s => s.code === clickedNode.id);
+            if (exists) return { ...t, subjects: t.subjects.filter(s => s.code !== clickedNode.id) };
+            return { ...t, subjects: [...(t.subjects || []), { code: clickedNode.id, grade: '' }] };
+          }
+          return t;
+        });
+        localStorage.setItem('pensum_gpa', JSON.stringify(newTerms)); return newTerms;
+      });
+    } else { setHighlightedNodeId(clickedNode.id); }
+  }, [activeTab, activeGpaTermId, isSimulatorMode, passedIds, baseGraph.subjectDict]);
+
+  // --- LÓGICA DERIVADA SEGURA ---
+  const derivedData = useMemo(() => {
+    let upAdj = {}; let downAdj = {};
+    baseGraph.edges.forEach(e => {
+      if (!downAdj[e.source]) downAdj[e.source] = []; downAdj[e.source].push(e.target);
+      if (!upAdj[e.target]) upAdj[e.target] = []; upAdj[e.target].push(e.source);
+    });
+
+    const getReachable = (startId, adj) => {
+      const v = new Set(); const q = [startId];
+      while (q.length > 0) { const curr = q.shift(); (adj[curr] || []).forEach(n => { if (!v.has(n)) { v.add(n); q.push(n); } }); }
+      return v;
+    };
+
+    const targetId = focusModeId || highlightedNodeId;
+    const upstream = targetId ? getReachable(targetId, upAdj) : new Set();
+    const downstream = targetId ? getReachable(targetId, downAdj) : new Set();
+
+    let pCredits = 0; let tCredits = 0; 
+    let c100 = { p: 0, t: 0 }; let c200 = { p: 0, t: 0 }; let c300 = { p: 0, t: 0 }; 
+    let simCredits = 0; let localGoalTotalCrd = 0; 
+    
+    const triStats = {}; const searchLower = searchTerm.toLowerCase();
+    const activeGpaTerm = gpaTerms.find(t => t.id === activeGpaTermId);
+    const activeTermSubjectCodes = activeGpaTerm ? new Set((activeGpaTerm.subjects || []).map(s => s.code)) : new Set();
+    const nodeH = isCompact ? 55 : 90; const trimestersHeights = {};
+
+    const dNodes = baseGraph.nodes.map(n => {
+      if (n.type === 'subject') {
+        tCredits += (n.data.credits || 0);
+        const isPassed = passedIds.has(n.id);
+        const lvlMatch = n.data.code.match(/\d/);
+        const lvl = lvlMatch ? lvlMatch[0] : '1';
+        
+        if (lvl === '1') { c100.t += n.data.credits; if (isPassed) c100.p += n.data.credits; }
+        else if (lvl === '2') { c200.t += n.data.credits; if (isPassed) c200.p += n.data.credits; }
+        else if (lvl === '3') { c300.t += n.data.credits; if (isPassed) c300.p += n.data.credits; }
+
+        if (isPassed) pCredits += (n.data.credits || 0);
+        
+        if (n.parentNode) {
+          if (!triStats[n.parentNode]) triStats[n.parentNode] = { total: 0, passed: 0, count: 0 };
+          triStats[n.parentNode].total += (n.data.credits || 0);
+          if (isPassed) triStats[n.parentNode].passed += (n.data.credits || 0);
+          
+          const newY = 70 + (triStats[n.parentNode].count * nodeH);
+          triStats[n.parentNode].count += 1;
+          trimestersHeights[n.parentNode] = 90 + (triStats[n.parentNode].count * nodeH);
+          
+          const isLocked = isStrictMode && (n.data.prereqs || []).some(pr => !passedIds.has(pr));
+          const isTarget = n.id === targetId;
+          const isConnected = upstream.has(n.id) || downstream.has(n.id);
+          const isSimulatorEligible = isSimulatorMode && activeTab === 'map' && !isPassed && (n.data.prereqs || []).every(pr => passedIds.has(pr));
+          const isInSimulatorCart = isSimulatorMode && activeTab === 'map' && simulatorCart.has(n.id);
+          if (isInSimulatorCart) simCredits += n.data.credits;
+          const isSelectedForGoal = activeTab === 'goal' && goalSubjects.has(n.id);
+          if (isSelectedForGoal) localGoalTotalCrd += n.data.credits;
+
+          let isDimmed = false;
+          if (activeTab === 'goal') isDimmed = goalSubjects.size > 0 && !isSelectedForGoal && !isPassed;
+          else if (isSimulatorMode && activeTab === 'map') isDimmed = !isSimulatorEligible && !isInSimulatorCart;
+          else if (focusModeId) isDimmed = !isTarget && !isConnected; 
+          else if (activeTab === 'gpa') isDimmed = activeGpaTermId && !activeTermSubjectCodes.has(n.id);
+          else if (highlightedNodeId) isDimmed = !isTarget && !isConnected;
+
+          const isSearched = searchTerm.length > 2 && (n.data.name.toLowerCase().includes(searchLower) || n.data.code.toLowerCase().includes(searchLower));
+          const isSelectedForGpa = activeTab === 'gpa' && activeTermSubjectCodes.has(n.id);
+
+          return { 
+            ...n, hidden: focusModeId && isDimmed, position: { x: 25, y: newY }, 
+            data: { ...n.data, isDarkMode, isCompact, isPassed, isLocked, isHighlighted: isTarget, isDimmed, isSearched, isSelectedForGpa, isSelectedForGoal, isSimulatorEligible, isInSimulatorCart, onToggle: handleToggleSubject, onDoubleClick: handleDoubleClick } 
+          };
+        }
+      }
+      return { ...n, data: { ...n.data, isDarkMode } };
+    });
+
+    const finalDNodes = dNodes.map(n => {
+      if (n.type === 'trimester' && trimestersHeights[n.id]) {
+        return { ...n, style: { ...n.style, height: trimestersHeights[n.id] }, data: { ...n.data, stats: triStats[n.id] || { total: 0, passed: 0 } } };
+      }
+      return n;
+    });
+
+    const edgeColors = { '1': isDarkMode ? '#818cf8' : '#4f46e5', '2': isDarkMode ? '#34d399' : '#059669', '3': isDarkMode ? '#fb7185' : '#e11d48' };
+    const dEdges = baseGraph.edges.map(e => {
+      const lvlMatch = e.source.match(/\d/);
+      const level = lvlMatch ? lvlMatch[0] : '1';
+      const color = edgeColors[level] || (isDarkMode ? '#64748b' : '#94a3b8');
+      
+      const isPassed = passedIds.has(e.source) || passedIds.has(e.target);
+      const isUpEdge = targetId && (upstream.has(e.source) || e.source === targetId) && (upstream.has(e.target) || e.target === targetId);
+      const isDownEdge = targetId && (downstream.has(e.source) || e.source === targetId) && (downstream.has(e.target) || e.target === targetId);
+      const isActiveHighlight = isUpEdge || isDownEdge;
+
+      let opacity = isDarkMode ? 0.6 : 0.8;
+      if (activeTab === 'goal' || (isSimulatorMode && activeTab === 'map') || (activeTab === 'gpa' && activeGpaTermId)) opacity = 0.05;
+      else if (focusModeId) opacity = isActiveHighlight ? 1 : 0;
+      else if (highlightedNodeId) opacity = isActiveHighlight ? 1 : 0.05;
+      else if (isPassed) opacity = 0.10;
+
+      return { ...e, animated: targetId ? isActiveHighlight : (e.style?.strokeDasharray ? true : !isPassed), hidden: focusModeId && !isActiveHighlight, style: { ...e.style, stroke: color, opacity, strokeWidth: isActiveHighlight ? 4 : 2 }, markerEnd: { type: MarkerType.ArrowClosed, color } };
+    });
+    
+    return { 
+      dNodes: finalDNodes, dEdges,
+      progress: { pCredits, tCredits, remainingCrd: tCredits - pCredits, percent: tCredits === 0 ? 0 : Math.round((pCredits / tCredits) * 100), c100, c200, c300 }, 
+      simulatorData: { simCredits }, goalTotalCrd: localGoalTotalCrd 
+    };
+  }, [baseGraph, passedIds, highlightedNodeId, focusModeId, searchTerm, isStrictMode, activeTab, activeGpaTermId, gpaTerms, isDarkMode, isCompact, isSimulatorMode, simulatorCart, goalSubjects, handleToggleSubject, handleDoubleClick]);
+
+  useEffect(() => {
+    setNodes(derivedData.dNodes); setEdges(derivedData.dEdges);
+  }, [derivedData.dNodes, derivedData.dEdges]);
+
+  const { progress, simulatorData, goalTotalCrd } = derivedData;
+
+  const gpaStats = useMemo(() => {
+    let gPts = 0; let gCrd = 0;
+    const termsData = gpaTerms.map(term => {
+      if (term.isManual) {
+        const mCredits = parseFloat(term.manualCredits) || 0; const mGpa = parseFloat(term.manualGpa) || 0;
+        gPts += (mGpa * mCredits); gCrd += mCredits; return { ...term, gpa: mGpa.toFixed(2), totalCreditsAttempted: mCredits };
+      }
+      let tPts = 0; let tCrd = 0; let tAtt = 0;
+      (term.subjects || []).forEach(s => {
+        const info = baseGraph.subjectDict[s.code];
+        if (info) { tAtt += info.credits; if (gradingScale[s.grade] !== undefined) { tPts += (gradingScale[s.grade] * info.credits); tCrd += info.credits; } }
+      });
+      gPts += tPts; gCrd += tCrd; return { ...term, gpa: tCrd > 0 ? (tPts / tCrd).toFixed(2) : '0.00', totalCreditsAttempted: tAtt };
+    });
+    return { terms: termsData, globalGpa: gCrd > 0 ? (gPts / gCrd).toFixed(2) : '0.00', globalCredits: gCrd, globalPoints: gPts };
+  }, [gpaTerms, baseGraph.subjectDict]);
+
+  const updateTerm = (termId, data) => { saveGpaTerms(gpaTerms.map(t => t.id === termId ? { ...t, ...data } : t)); };
+  const loadOfficialTrimester = (termId) => {
+    const termIndex = gpaTerms.length - gpaTerms.findIndex(t => t.id === termId) - 1;
+    const official = baseGraph.trimestersList[termIndex];
+    if (official) { updateTerm(termId, { subjects: official.subjects.map(s => ({ code: s.code, grade: '' })) }); } 
+    else { alert("No hay un trimestre oficial correspondiente en el mapa."); }
+  };
+
+  const futureCredits = goalTotalCrd > 0 ? goalTotalCrd : progress.remainingCrd;
+  const neededPoints = (parseFloat(targetGpa) * (gpaStats.globalCredits + futureCredits)) - gpaStats.globalPoints;
+  const neededAvg = futureCredits > 0 ? (neededPoints / futureCredits).toFixed(2) : 0;
+  
+  let predictorMsg = ""; let predictorColor = "";
+  if (neededAvg > 4.0) { predictorMsg = "Matemáticamente Imposible ❌"; predictorColor = '#ef4444'; }
+  else if (neededAvg <= 0) { predictorMsg = "Ya lo lograste o es muy fácil ✅"; predictorColor = '#10b981'; }
+  else {
+    let neededLetter = 'A+'; const numAvg = parseFloat(neededAvg);
+    if (numAvg <= 1.0) neededLetter = 'D'; else if (numAvg <= 2.0) neededLetter = 'C'; else if (numAvg <= 2.5) neededLetter = 'C+';
+    else if (numAvg <= 3.0) neededLetter = 'B'; else if (numAvg <= 3.5) neededLetter = 'B+'; else if (numAvg <= 3.75) neededLetter = 'A';
+    predictorMsg = `Necesitas promediar: ${neededLetter} (${neededAvg})`; predictorColor = '#f59e0b';
+  }
+
+  const onNodesChange = useCallback((c) => setNodes(n => applyNodeChanges(c, n)), []);
+  const onEdgesChange = useCallback((c) => setEdges(e => applyEdgeChanges(c, e)), []);
+
+  const bgPanel = isDarkMode ? '#0f172a' : '#ffffff';
+  const textPanel = isDarkMode ? '#f8fafc' : '#1e293b';
+  const borderPanel = isDarkMode ? '#334155' : '#e2e8f0';
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', width: '100%', fontFamily: 'sans-serif', backgroundColor: isDarkMode ? '#020617' : '#f1f5f9', userSelect: isResizing.current ? 'none' : 'auto' }}>
+      
+      <div style={{ width: sidebarWidth, padding: '0', background: bgPanel, borderRight: `1px solid ${borderPanel}`, display: 'flex', flexDirection: 'column', zIndex: 10, color: textPanel }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', background: isDarkMode ? '#1e293b' : '#f8fafc', borderBottom: `1px solid ${borderPanel}` }}>
+          <button onClick={resetProgress} style={{ fontSize: '11px', padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset All</button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={toggleCompactMode} title="Modo Compacto" style={{ fontSize: '16px', background: isCompact ? '#3b82f6' : 'transparent', color: isCompact ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>🗜️</button>
+            <button onClick={toggleDarkMode} title="Modo Oscuro" style={{ fontSize: '16px', background: 'transparent', border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>{isDarkMode ? '☀️' : '🌙'}</button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', borderBottom: `1px solid ${borderPanel}` }}>
+          <button onClick={() => { setActiveTab('map'); setActiveGpaTermId(null); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'map' ? bgPanel : 'transparent', color: activeTab === 'map' ? textPanel : '#64748b', borderBottom: activeTab === 'map' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>MAPA</button>
+          <button onClick={() => { setActiveTab('gpa'); setIsSimulatorMode(false); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'gpa' ? bgPanel : 'transparent', color: activeTab === 'gpa' ? textPanel : '#64748b', borderBottom: activeTab === 'gpa' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>GPA</button>
+          <button onClick={() => { setActiveTab('goal'); setIsSimulatorMode(false); setActiveGpaTermId(null); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'goal' ? bgPanel : 'transparent', color: activeTab === 'goal' ? textPanel : '#64748b', borderBottom: activeTab === 'goal' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>META GPA</button>
+        </div>
+
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flexGrow: 1, overflowY: 'auto' }}>
+          
+          {activeTab === 'map' && (
+            <>
+              {/* GUÍA DE INTELIGENCIA ARTIFICIAL */}
+              <div style={{ padding: '12px', background: isDarkMode ? '#334155' : '#f1f5f9', borderRadius: '8px', marginBottom: '15px', fontSize: '12px', color: isDarkMode ? '#cbd5e1' : '#475569', border: `1px solid ${borderPanel}` }}>
+                <b style={{ color: textPanel }}>Genera tu Pensum con IA 🤖</b><br/>
+                Copia este prompt y pégalo en ChatGPT/Claude junto al PDF de tu plan de estudios:<br/><br/>
+                <span style={{ display: 'block', padding: '8px', background: isDarkMode ? '#0f172a' : '#ffffff', border: `1px solid ${borderPanel}`, borderRadius: '6px', userSelect: 'all', fontStyle: 'italic', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                  "Actúa como un estructurador de datos. Convierte este pensum al formato exacto: '# Trimestre [N]' seguido de las materias así: 'CLAVE | Nombre | Prerequisitos separados por coma | Créditos'. Si no hay prerequisitos, deja el espacio vacío. Coloca los laboratorios debajo de su teoría. No agregues saludos ni explicaciones."
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                <input type="text" placeholder="🔍 Buscar (Ej. IBI305)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flexGrow: 1, padding: '10px', borderRadius: '8px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel }} />
+                <button onClick={handleSearchClick} style={{ width: '40px', background: '#eab308', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '18px' }}>🎯</button>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                <button onClick={() => parseTextToGraph(inputText)} style={{ flex: 1, padding: '12px', background: isDarkMode ? '#3b82f6' : '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px' }}>Renderizar Pensum</button>
+                <button onClick={() => setIsSimulatorMode(!isSimulatorMode)} style={{ flex: 1, padding: '12px', background: isSimulatorMode ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px' }}>
+                  {isSimulatorMode ? `SALIR SIM (${simulatorData.simCredits} CR)` : 'Simulador 🛒'}
+                </button>
+              </div>
+              
+              {/* SLIDER DE PENSUMS PRECARGADOS */}
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '5px' }}>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.IBM_2020)} style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer', whiteSpace: 'nowrap' }}>IBM 2020</button>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.IMC_2020)} style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer', whiteSpace: 'nowrap' }}>IMC 2020</button>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.ELE_2020)} style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer', whiteSpace: 'nowrap' }}>ELE 2020</button>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.IEC_2020)} style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer', whiteSpace: 'nowrap' }}>IEC 2020</button>
+              </div>
+
+              <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} style={{ flexGrow: 1, padding: '15px', fontFamily: 'monospace', borderRadius: '8px', border: `1px solid ${borderPanel}`, resize: 'none', whiteSpace: 'pre', fontSize: '11px', background: isDarkMode ? '#0f172a' : '#f8fafc', color: textPanel }} />
+            </>
+          )}
+
+          {activeTab === 'gpa' && (
+             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+             <div style={{ background: isDarkMode ? '#1e293b' : '#0f172a', color: 'white', padding: '20px', borderRadius: '12px', textAlign: 'center', marginBottom: '20px' }}>
+               <h3 style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>ÍNDICE GENERAL ACUMULADO</h3>
+               <div style={{ fontSize: '40px', fontWeight: '900', color: gpaStats.globalGpa >= 3.0 ? '#4ade80' : '#facc15' }}>{gpaStats.globalGpa}</div>
+             </div>
+             <button onClick={() => saveGpaTerms([{ id: Date.now(), name: `Trimestre ${gpaTerms.length + 1}`, overcredit: false, isManual: false, manualGpa: '', manualCredits: '', subjects: [] }, ...gpaTerms])} style={{ width: '100%', padding: '10px', background: isDarkMode ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}>+ Agregar Trimestre</button>
+             
+             <div style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+               {gpaStats.terms.map(term => {
+                  const maxCredits = term.overcredit ? 26 : 21;
+                  const isOverLimit = term.totalCreditsAttempted > maxCredits;
+                  return (
+                  <div key={term.id} onClick={() => setActiveGpaTermId(term.id)} style={{ background: activeGpaTermId === term.id ? (isDarkMode ? '#1e3a8a' : '#f0f9ff') : (isDarkMode ? '#1e293b' : '#f8fafc'), border: `2px solid ${activeGpaTermId === term.id ? '#3b82f6' : borderPanel}`, borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                       <h4 style={{ margin: 0, color: textPanel }}>{term.name}</h4>
+                       <div style={{ background: isDarkMode ? '#0f172a' : '#0f172a', color: 'white', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold', fontSize: '12px' }}>GPA: {term.gpa}</div>
+                     </div>
+                     <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#64748b' }}>
+                       <input type="checkbox" checked={term.isManual} onChange={(e) => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, isManual: e.target.checked } : t))} /> Ingreso Manual
+                     </label>
+                     {term.isManual ? (
+                       <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                         <input type="number" placeholder="GPA" value={term.manualGpa} onChange={(e) => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, manualGpa: e.target.value } : t))} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${borderPanel}`, background: bgPanel, color: textPanel }} />
+                         <input type="number" placeholder="Créditos" value={term.manualCredits} onChange={(e) => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, manualCredits: e.target.value } : t))} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${borderPanel}`, background: bgPanel, color: textPanel }} />
+                       </div>
+                     ) : (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', margin: '10px 0' }}>
+                            <span style={{ color: isOverLimit ? '#ef4444' : '#64748b', fontWeight: isOverLimit ? 'bold' : 'normal' }}>Créditos: {term.totalCreditsAttempted} / {maxCredits}</span>
+                            <label><input type="checkbox" checked={term.overcredit} onChange={() => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, overcredit: !t.overcredit } : t))} /> 26 CR</label>
+                          </div>
+                          <div style={{ display: 'flex', gap: '5px', marginBottom: '10px', alignItems: 'center' }}>
+                            <button onClick={(e) => { e.stopPropagation(); loadOfficialTrimester(term.id); }} style={{ flex: 1, fontSize: '11px', padding: '6px', background: isDarkMode ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cargar del Pensum</button>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>o Toca materias 👉</span>
+                          </div>
+                          {(term.subjects || []).map(s => {
+                            const info = baseGraph.subjectDict[s.code];
+                            return (
+                              <div key={s.code} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${borderPanel}` }}>
+                                <div style={{ fontSize: '12px', color: textPanel, fontWeight: 'bold' }}>{s.code} <span style={{color:'#64748b', fontWeight:'normal'}}>- {info?.credits}CR</span></div>
+                                <select value={s.grade} onChange={(e) => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, subjects: (t.subjects || []).map(sub => sub.code === s.code ? { ...sub, grade: e.target.value } : sub) } : t))} style={{ padding: '4px', borderRadius: '4px', border: `1px solid ${borderPanel}`, background: bgPanel, color: textPanel }}>
+                                  <option value="" disabled>Nota</option>
+                                  {Object.keys(gradingScale).map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                              </div>
+                            )
+                          })}
+                        </>
+                     )}
+                  </div>
+                 )
+               })}
+             </div>
+           </div>
+          )}
+
+          {activeTab === 'goal' && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ background: isDarkMode ? '#4c1d95' : '#7e22ce', color: 'white', padding: '20px', borderRadius: '12px', textAlign: 'center', marginBottom: '20px' }}>
+                <h3 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#d8b4fe' }}>PREDICTOR DE ÍNDICE</h3>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '14px' }}>Meta:</span>
+                  <input type="number" step="0.01" max="4.00" min="0" value={targetGpa} onChange={(e) => setTargetGpa(e.target.value)} style={{ width: '80px', fontSize: '24px', fontWeight: '900', textAlign: 'center', background: 'transparent', color: 'white', border: 'none', borderBottom: '2px solid #d8b4fe', outline: 'none' }} />
+                </div>
+              </div>
+              
+              <div style={{ padding: '15px', background: isDarkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: `1px solid ${borderPanel}`, marginBottom: '20px' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: textPanel }}>Tu Situación Actual</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', marginBottom: '5px' }}><span>Índice Actual:</span> <b>{gpaStats.globalGpa}</b></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b' }}><span>Créditos Computados:</span> <b>{gpaStats.globalCredits} CR</b></div>
+              </div>
+
+              <div style={{ padding: '15px', background: isDarkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: `1px solid ${borderPanel}` }}>
+                <h4 style={{ margin: '0 0 10px 0', color: textPanel }}>El Veredicto</h4>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '15px', lineHeight: '1.4' }}>
+                  Calculando en base a <b>{futureCredits} CR</b>. (Selecciona materias en el mapa que planeas cursar, o calcularemos con todas las que te faltan).
+                </p>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: predictorColor, textAlign: 'center', padding: '15px', background: isDarkMode ? '#0f172a' : '#fff', borderRadius: '8px', border: `1px solid ${predictorColor}50` }}>
+                  {predictorMsg}
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      <div 
+        onMouseDown={startResizing}
+        style={{ width: '6px', height: '100%', cursor: 'ew-resize', backgroundColor: isDarkMode ? '#334155' : '#e2e8f0', zIndex: 50, transition: 'background 0.2s' }}
+        onMouseOver={(e) => e.target.style.backgroundColor = '#3b82f6'}
+        onMouseOut={(e) => e.target.style.backgroundColor = isDarkMode ? '#334155' : '#e2e8f0'}
+      />
+
+      <div style={{ flexGrow: 1, position: 'relative' }}>
+        <ReactFlow 
+          nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick} onPaneClick={() => { setHighlightedNodeId(null); setFocusModeId(null); setActiveGpaTermId(null); }} 
+          nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView minZoom={0.05}
+        >
+          <Background color={isDarkMode ? '#1e293b' : '#cbd5e1'} gap={25} size={1} />
+          <Controls />
+        </ReactFlow>
+
+        <div style={{ position: 'absolute', bottom: 15, right: 15, background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 8px 15px -3px rgba(0, 0, 0, 0.3)', zIndex: 100, border: `1px solid ${borderPanel}`, minWidth: '200px' }}>
+          
+          {isSimulatorMode ? (
+            <div style={{ textAlign: 'center' }}>
+              <h4 style={{ margin: '0 0 5px 0', color: '#f59e0b' }}>SIMULADOR ACTIVO</h4>
+              <div style={{ fontSize: '24px', fontWeight: '900', color: simulatorData.simCredits > 26 ? '#ef4444' : textPanel }}>{simulatorData.simCredits} / 21 CR</div>
+              <p style={{ fontSize: '11px', color: '#64748b', margin: '5px 0 0 0' }}>Haz clic en las materias naranjas para armar tu trimestre.</p>
+            </div>
+          ) : (
+            <>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: textPanel, display: 'flex', justifyContent: 'space-between' }}>
+                <span>Mi Progreso</span> <span style={{ color: isDarkMode ? '#f8fafc' : '#0f172a' }}>{progress.percent}%</span>
+              </h4>
+              <div style={{ width: '100%', height: '6px', background: isDarkMode ? '#334155' : '#e2e8f0', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}><div style={{ height: '100%', background: '#10b981', width: `${progress.percent}%` }}></div></div>
+              <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'right', marginBottom: '10px', fontWeight: 'bold' }}>Total: {progress.pCredits} / {progress.tCredits} CR</div>
+              <hr style={{ border: 'none', borderTop: `1px solid ${borderPanel}`, margin: '10px 0' }} />
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#475569' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '10px', height: '10px', background: isDarkMode ? '#818cf8' : '#4f46e5', borderRadius: '50%', marginRight: '6px' }}></div> <span>F. General</span></div>
+                <b>{progress.c100.p}/{progress.c100.t}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#475569' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '10px', height: '10px', background: isDarkMode ? '#34d399' : '#059669', borderRadius: '50%', marginRight: '6px' }}></div> <span>Especializada</span></div>
+                <b>{progress.c200.p}/{progress.c200.t}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#475569' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '10px', height: '10px', background: isDarkMode ? '#fb7185' : '#e11d48', borderRadius: '50%', marginRight: '6px' }}></div> <span>Profesional</span></div>
+                <b>{progress.c300.p}/{progress.c300.t}</b>
+              </div>
+              
+              <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: '10px 0' }} />
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold' }}>
+                Bloqueo Estricto 🔒
+                <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
+              </label>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- COMPONENTE DEL PANEL DE AYUDA (Panel Rojo) ---
+function HelpPanel({ isDarkMode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const bg = isDarkMode ? '#7f1d1d' : '#ef4444';
+
+  return (
+    <div style={{ position: 'absolute', top: 15, right: 15, zIndex: 1000 }}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ background: bg, color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}
+      >
+        {isOpen ? 'Cerrar Guía' : '¿Cómo usarlo? 📖'}
+      </button>
+      
+      {isOpen && (
+        <div style={{ marginTop: '10px', width: '300px', background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', border: `2px solid ${bg}`, boxShadow: '0 10px 15px rgba(0,0,0,0.3)', color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
+          <h4 style={{ margin: '0 0 10px 0' }}>Funciones Principales:</h4>
+          <ul style={{ fontSize: '12px', paddingLeft: '20px', lineHeight: '1.6' }}>
+            <li><b>Mapa:</b> Doble clic en materia para modo enfoque.</li>
+            <li><b>GPA:</b> Selecciona un trimestre, luego toca materias en el mapa para agregarlas.</li>
+            <li><b>Simulador:</b> Actívalo para ver qué materias puedes inscribir según tus aprobadas.</li>
+            <li><b>Datos:</b> Tus cambios se guardan automáticamente en tu navegador.</li>
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ... (Luego en tu return dentro de FlowApp, añade <HelpPanel isDarkMode={isDarkMode} /> al final del JSX)
+export default function App() { 
+  return (
+    <ReactFlowProvider>
+      <ErrorBoundary>
+        <FlowApp />
+      </ErrorBoundary>
+    </ReactFlowProvider>
+  ); 
+}
