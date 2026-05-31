@@ -583,7 +583,7 @@ function FlowApp() {
       />
 
       {/* ÁREA DEL MAPA */}
-      <div style={{ flexGrow: 1, position: 'relative', width: '100%', height: '100%' }} ref={reactFlowWrapper}>
+      <div style={{ flexGrow: 1, position: 'relative', width: '100%', height: '100%' }}>
         <ReactFlow 
           nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick} onPaneClick={() => { setHighlightedNodeId(null); setFocusModeId(null); setActiveGpaTermId(null); }} 
