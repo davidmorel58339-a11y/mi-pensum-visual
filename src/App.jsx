@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo, Component } from 'react';
 import ReactFlow, { Background, Controls, MarkerType, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, ReactFlowProvider } from 'reactflow';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import 'reactflow/dist/style.css';
 import SubjectNode from './SubjectNode';
 import TrimesterNode from './TrimesterNode';
@@ -1138,6 +1139,7 @@ export default function App() {
       <ErrorBoundary>
         <FlowApp />
         <Analytics /> 
+        <SpeedInsights />
       </ErrorBoundary>
     </ReactFlowProvider>
   ); 
