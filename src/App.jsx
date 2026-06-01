@@ -73,7 +73,8 @@ function HelpPanel({ isDarkMode, isMobile }) {
           <h4 style={{ margin: '0 0 10px 0', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`, paddingBottom: '5px', fontSize: isMobile ? '13px' : '15px' }}>Funciones Principales:</h4>
           <ul style={{ fontSize: isMobile ? '11.5px' : '12.5px', paddingLeft: '20px', lineHeight: '1.6', margin: 0 }}>
             <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Doble clic en una materia para aislar su ruta de prerrequisitos.</li>
-            <li style={{ marginBottom: '6px' }}><b>Simulador 🛒:</b> Selecciona materias para armar tu trimestre ideal sin pasarte del límite de créditos.</li>
+            <li style={{ marginBottom: '6px' }}><b>Calculadora GPA:</b> (Pestaña GPA) Calcula tu índice general y por trimestre cargando tus notas.</li>
+            <li style={{ marginBottom: '6px' }}><b>Simulador 🛒:</b> Selecciona materias para armar tu trimestre ideal sin pasarte del límite.</li>
             <li style={{ marginBottom: '6px' }}><b>Auto-Llenar ⚡:</b> Arma el trimestre priorizando las materias más críticas según el Mapa de Calor.</li>
             <li style={{ marginBottom: '6px' }}><b>Planes A/B:</b> Guarda y compara diferentes combinaciones en el simulador.</li>
             <li><b>Meta GPA:</b> Calcula exactamente qué notas necesitas para alcanzar tu índice soñado.</li>
@@ -114,7 +115,7 @@ function FlowApp() {
   const [simulatorLimit, setSimulatorLimit] = useState(21); 
   const isSimulatorModeRef = useRef(false); 
   const [simulatorCart, setSimulatorCart] = useState(new Set());
-  const [scenarios, setScenarios] = useState({ A: [], B: [] }); // NUEVO: Manejo de Escenarios
+  const [scenarios, setScenarios] = useState({ A: [], B: [] }); 
 
   const [gpaTerms, setGpaTerms] = useState([]); 
   const [activeGpaTermId, setActiveGpaTermId] = useState(null); 
@@ -148,7 +149,10 @@ function FlowApp() {
       if (sSimLimit !== null) setSimulatorLimit(parseInt(sSimLimit));
       if (sDark !== null) setIsDarkMode(JSON.parse(sDark));
       if (sCompact !== null) setIsCompact(JSON.parse(sCompact));
-      if (sScenarios) setScenarios(JSON.parse(sScenarios));
+      if (sScenarios) {
+        const parsed = JSON.parse(sScenarios);
+        setScenarios({ A: parsed.A || [], B: parsed.B || [] });
+      }
       if (sGpaTerms) {
         const parsed = JSON.parse(sGpaTerms);
         if (Array.isArray(parsed)) setGpaTerms(parsed.map(t => ({...t, subjects: t.subjects || []})));
@@ -304,13 +308,27 @@ function FlowApp() {
 
   // --- MANEJO DE ESCENARIOS ---
   const saveScenario = (planName) => {
+    if (simulatorCart.size === 0) {
+      alert(`No tienes materias seleccionadas para guardar en el Plan ${planName}.`);
+      return;
+    }
     const newScenarios = { ...scenarios, [planName]: Array.from(simulatorCart) };
     setScenarios(newScenarios);
     localStorage.setItem('pensum_scenarios', JSON.stringify(newScenarios));
+    
+    let crds = 0;
+    simulatorCart.forEach(code => crds += (baseGraph.subjectDict[code]?.credits || 0));
+    alert(`✅ Plan ${planName} guardado exitosamente con ${crds} Créditos.`);
   };
 
   const loadScenario = (planName) => {
-    setSimulatorCart(new Set(scenarios[planName]));
+    const validSubjects = (scenarios[planName] || []).filter(code => baseGraph.subjectDict[code]);
+    if (validSubjects.length === 0) {
+      alert(`El Plan ${planName} está vacío o las materias no pertenecen a esta carrera.`);
+      return;
+    }
+    setSimulatorCart(new Set(validSubjects));
+    alert(`📂 Plan ${planName} cargado en el simulador.`);
   };
 
 
@@ -376,7 +394,7 @@ function FlowApp() {
     }
     
     setSimulatorCart(newCart);
-    setIsHeatmapMode(true); // Enciende el mapa de calor automáticamente para justificar la elección
+    setIsHeatmapMode(true); 
   };
 
   const onNodeClick = useCallback((_, clickedNode) => {
@@ -718,7 +736,7 @@ function FlowApp() {
                 <button onClick={() => { 
                   if (isSimulatorMode) {
                     setSimulatorCart(new Set()); 
-                    setIsHeatmapMode(false); // Apagar mapa de calor al salir
+                    setIsHeatmapMode(false); 
                   }
                   setIsSimulatorMode(!isSimulatorMode); 
                   if(isMobile && !isSimulatorMode) setSidebarOpen(false); 
@@ -932,11 +950,11 @@ function FlowApp() {
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <div style={{ flex: 1, display: 'flex', gap: '4px' }}>
                         <button onClick={() => saveScenario('A')} style={{ flex: 1, padding: '4px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}>💾 A</button>
-                        <button onClick={() => loadScenario('A')} disabled={scenarios.A.length === 0} style={{ flex: 1, padding: '4px', background: scenarios.A.length > 0 ? '#10b981' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: scenarios.A.length > 0 ? 'pointer' : 'not-allowed' }}>📂 A</button>
+                        <button onClick={() => loadScenario('A')} disabled={!scenarios.A || scenarios.A.length === 0} style={{ flex: 1, padding: '4px', background: (scenarios.A && scenarios.A.length > 0) ? '#10b981' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: (scenarios.A && scenarios.A.length > 0) ? 'pointer' : 'not-allowed' }}>📂 A</button>
                       </div>
                       <div style={{ flex: 1, display: 'flex', gap: '4px' }}>
                         <button onClick={() => saveScenario('B')} style={{ flex: 1, padding: '4px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}>💾 B</button>
-                        <button onClick={() => loadScenario('B')} disabled={scenarios.B.length === 0} style={{ flex: 1, padding: '4px', background: scenarios.B.length > 0 ? '#10b981' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: scenarios.B.length > 0 ? 'pointer' : 'not-allowed' }}>📂 B</button>
+                        <button onClick={() => loadScenario('B')} disabled={!scenarios.B || scenarios.B.length === 0} style={{ flex: 1, padding: '4px', background: (scenarios.B && scenarios.B.length > 0) ? '#10b981' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: (scenarios.B && scenarios.B.length > 0) ? 'pointer' : 'not-allowed' }}>📂 B</button>
                       </div>
                     </div>
                   </div>
@@ -967,7 +985,7 @@ function FlowApp() {
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold', marginBottom: '6px' }}>
-                    Bloqueo de materias con pre-req incumplidos🔒
+                    Bloqueo Estricto 🔒
                     <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
                   </label>
 
