@@ -72,11 +72,11 @@ function HelpPanel({ isDarkMode, isMobile }) {
         <div style={{ marginTop: '10px', width: isMobile ? '260px' : '320px', background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', border: `2px solid ${bg}`, boxShadow: '0 10px 15px rgba(0,0,0,0.3)', color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
           <h4 style={{ margin: '0 0 10px 0', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`, paddingBottom: '5px', fontSize: isMobile ? '13px' : '15px' }}>Funciones Principales:</h4>
           <ul style={{ fontSize: isMobile ? '11.5px' : '12.5px', paddingLeft: '20px', lineHeight: '1.6', margin: 0 }}>
-            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Haz <i>doble clic</i> en cualquier materia para aislar su cadena de prerrequisitos.</li>
-            <li style={{ marginBottom: '6px' }}><b>Simulador 🛒:</b> Descubre qué materias tienes "desbloqueadas" y arma tu próximo trimestre sin pasarte del límite.</li>
-            <li style={{ marginBottom: '6px' }}><b>Auto-Llenar ⚡:</b> El algoritmo armará tu trimestre ideal basándose en las materias que abren más caminos.</li>
-            <li style={{ marginBottom: '6px' }}><b>Mapa de Calor 🔥:</b> Un escáner que te dice matemáticamente cuáles materias son "Cuellos de Botella".</li>
-            <li><b>Correquisitos:</b> Las líneas punteadas en el mapa indican laboratorios o materias que deben darse juntas.</li>
+            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Doble clic en una materia para aislar su ruta de prerrequisitos.</li>
+            <li style={{ marginBottom: '6px' }}><b>Simulador 🛒:</b> Selecciona materias para armar tu trimestre ideal sin pasarte del límite de créditos.</li>
+            <li style={{ marginBottom: '6px' }}><b>Auto-Llenar ⚡:</b> Arma el trimestre priorizando las materias más críticas según el Mapa de Calor.</li>
+            <li style={{ marginBottom: '6px' }}><b>Planes A/B:</b> Guarda y compara diferentes combinaciones en el simulador.</li>
+            <li><b>Meta GPA:</b> Calcula exactamente qué notas necesitas para alcanzar tu índice soñado.</li>
           </ul>
         </div>
       )}
@@ -114,6 +114,8 @@ function FlowApp() {
   const [simulatorLimit, setSimulatorLimit] = useState(21); 
   const isSimulatorModeRef = useRef(false); 
   const [simulatorCart, setSimulatorCart] = useState(new Set());
+  const [scenarios, setScenarios] = useState({ A: [], B: [] }); // NUEVO: Manejo de Escenarios
+
   const [gpaTerms, setGpaTerms] = useState([]); 
   const [activeGpaTermId, setActiveGpaTermId] = useState(null); 
   
@@ -135,6 +137,7 @@ function FlowApp() {
       const sGpaTerms = localStorage.getItem('pensum_gpa');
       const sDark = localStorage.getItem('pensum_dark');
       const sCompact = localStorage.getItem('pensum_compact');
+      const sScenarios = localStorage.getItem('pensum_scenarios');
       
       if (sText) { setInputText(sText); parseTextToGraph(sText); }
       else { parseTextToGraph(PRELOADED_PENSUMS.IBM_2020); }
@@ -145,6 +148,7 @@ function FlowApp() {
       if (sSimLimit !== null) setSimulatorLimit(parseInt(sSimLimit));
       if (sDark !== null) setIsDarkMode(JSON.parse(sDark));
       if (sCompact !== null) setIsCompact(JSON.parse(sCompact));
+      if (sScenarios) setScenarios(JSON.parse(sScenarios));
       if (sGpaTerms) {
         const parsed = JSON.parse(sGpaTerms);
         if (Array.isArray(parsed)) setGpaTerms(parsed.map(t => ({...t, subjects: t.subjects || []})));
@@ -268,7 +272,6 @@ function FlowApp() {
       return !found; 
     });
 
-    // NUEVA LÓGICA DE CORREQUISITOS (Agrupación)
     const adjCoreq = {};
     Object.keys(dict).forEach(k => adjCoreq[k] = []);
     cleanEdges.forEach(e => {
@@ -299,6 +302,18 @@ function FlowApp() {
     setBaseGraph({ nodes: bNodes, edges: bEdges, subjectDict: dict, trimestersList: trimesters });
   };
 
+  // --- MANEJO DE ESCENARIOS ---
+  const saveScenario = (planName) => {
+    const newScenarios = { ...scenarios, [planName]: Array.from(simulatorCart) };
+    setScenarios(newScenarios);
+    localStorage.setItem('pensum_scenarios', JSON.stringify(newScenarios));
+  };
+
+  const loadScenario = (planName) => {
+    setSimulatorCart(new Set(scenarios[planName]));
+  };
+
+
   // --- LÓGICA AUTOCOMPLETADO (SPEEDRUN MODE) ---
   const handleAutoFill = () => {
     if (!isSimulatorMode) return;
@@ -309,6 +324,7 @@ function FlowApp() {
       downAdj[e.source].push(e.target);
     });
 
+    // Lógica Topológica para calcular el Peso (Misma del Mapa de Calor)
     const getReachableCount = (startId) => {
       const v = new Set(); const q = [startId];
       while (q.length > 0) { 
@@ -346,6 +362,7 @@ function FlowApp() {
       }
     });
 
+    // Ordenar por Peso (para agarrar los Cuellos de Botella primero)
     eligibleGroups.sort((a, b) => b.weight - a.weight || b.credits - a.credits);
 
     let currentCredits = 0;
@@ -359,6 +376,7 @@ function FlowApp() {
     }
     
     setSimulatorCart(newCart);
+    setIsHeatmapMode(true); // Enciende el mapa de calor automáticamente para justificar la elección
   };
 
   const onNodeClick = useCallback((_, clickedNode) => {
@@ -661,8 +679,10 @@ function FlowApp() {
             {isMobile && <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', padding: '6px 10px', background: isDarkMode ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar</button>}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {/* BOTÓN MAPA DE CALOR */}
-            <button onClick={() => setIsHeatmapMode(!isHeatmapMode)} title="Mapa de Calor (Cuellos de Botella)" style={{ fontSize: '16px', background: isHeatmapMode ? '#ef4444' : 'transparent', color: isHeatmapMode ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px', transition: 'background 0.3s' }}>🔥</button>
+            {/* BOTÓN MAPA DE CALOR: SOLO VISIBLE EN SIMULADOR */}
+            {isSimulatorMode && (
+              <button onClick={() => setIsHeatmapMode(!isHeatmapMode)} title="Mapa de Calor (Cuellos de Botella)" style={{ fontSize: '16px', background: isHeatmapMode ? '#ef4444' : 'transparent', color: isHeatmapMode ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px', transition: 'background 0.3s' }}>🔥</button>
+            )}
             <button onClick={toggleCompactMode} title="Modo Compacto" style={{ fontSize: '16px', background: isCompact ? '#3b82f6' : 'transparent', color: isCompact ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>🗜️</button>
             <button onClick={toggleDarkMode} title="Modo Oscuro" style={{ fontSize: '16px', background: 'transparent', border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>{isDarkMode ? '☀️' : '🌙'}</button>
           </div>
@@ -670,8 +690,8 @@ function FlowApp() {
 
         <div style={{ display: 'flex', borderBottom: `1px solid ${borderPanel}` }}>
           <button onClick={() => { setActiveTab('map'); setActiveGpaTermId(null); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'map' ? bgPanel : 'transparent', color: activeTab === 'map' ? textPanel : '#64748b', borderBottom: activeTab === 'map' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>MAPA</button>
-          <button onClick={() => { setActiveTab('gpa'); setIsSimulatorMode(false); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'gpa' ? bgPanel : 'transparent', color: activeTab === 'gpa' ? textPanel : '#64748b', borderBottom: activeTab === 'gpa' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>GPA</button>
-          <button onClick={() => { setActiveTab('goal'); setIsSimulatorMode(false); setActiveGpaTermId(null); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'goal' ? bgPanel : 'transparent', color: activeTab === 'goal' ? textPanel : '#64748b', borderBottom: activeTab === 'goal' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>META GPA</button>
+          <button onClick={() => { setActiveTab('gpa'); setIsSimulatorMode(false); setIsHeatmapMode(false); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'gpa' ? bgPanel : 'transparent', color: activeTab === 'gpa' ? textPanel : '#64748b', borderBottom: activeTab === 'gpa' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>GPA</button>
+          <button onClick={() => { setActiveTab('goal'); setIsSimulatorMode(false); setIsHeatmapMode(false); setActiveGpaTermId(null); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'goal' ? bgPanel : 'transparent', color: activeTab === 'goal' ? textPanel : '#64748b', borderBottom: activeTab === 'goal' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>META GPA</button>
         </div>
 
         <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', flexGrow: 1, overflowY: 'auto' }}>
@@ -696,14 +716,16 @@ function FlowApp() {
                   <button onClick={() => { parseTextToGraph(inputText); if(isMobile) setSidebarOpen(false); }} style={{ flex: 1, padding: '12px', background: isDarkMode ? '#3b82f6' : '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>Renderizar Pensum</button>
                 )}
                 <button onClick={() => { 
-                  if (isSimulatorMode) setSimulatorCart(new Set()); 
+                  if (isSimulatorMode) {
+                    setSimulatorCart(new Set()); 
+                    setIsHeatmapMode(false); // Apagar mapa de calor al salir
+                  }
                   setIsSimulatorMode(!isSimulatorMode); 
                   if(isMobile && !isSimulatorMode) setSidebarOpen(false); 
                 }} style={{ flex: 1, padding: '12px', background: isSimulatorMode ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>
                   {isSimulatorMode ? `SALIR SIM (${simulatorData.simCredits} CR)` : 'Simulador 🛒'}
                 </button>
                 
-                {/* BOTÓN SPEEDRUN AUTOCOMPLETADO */}
                 {isSimulatorMode && (
                   <button onClick={handleAutoFill} style={{ flex: 1, padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                     ⚡ Auto-Llenar
@@ -903,6 +925,22 @@ function FlowApp() {
                       })}
                     </div>
                   )}
+
+                  {/* MANEJO DE ESCENARIOS */}
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px dashed ${isDarkMode ? '#334155' : '#cbd5e1'}` }}>
+                    <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '6px', fontWeight: 'bold' }}>MANEJO DE ESCENARIOS:</div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ flex: 1, display: 'flex', gap: '4px' }}>
+                        <button onClick={() => saveScenario('A')} style={{ flex: 1, padding: '4px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}>💾 A</button>
+                        <button onClick={() => loadScenario('A')} disabled={scenarios.A.length === 0} style={{ flex: 1, padding: '4px', background: scenarios.A.length > 0 ? '#10b981' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: scenarios.A.length > 0 ? 'pointer' : 'not-allowed' }}>📂 A</button>
+                      </div>
+                      <div style={{ flex: 1, display: 'flex', gap: '4px' }}>
+                        <button onClick={() => saveScenario('B')} style={{ flex: 1, padding: '4px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}>💾 B</button>
+                        <button onClick={() => loadScenario('B')} disabled={scenarios.B.length === 0} style={{ flex: 1, padding: '4px', background: scenarios.B.length > 0 ? '#10b981' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: scenarios.B.length > 0 ? 'pointer' : 'not-allowed' }}>📂 B</button>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               ) : (
                 <>
@@ -929,7 +967,7 @@ function FlowApp() {
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold', marginBottom: '6px' }}>
-                    Bloqueo Estricto 🔒
+                    Bloqueo de materias con pre-req incumplidos🔒
                     <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
                   </label>
 
