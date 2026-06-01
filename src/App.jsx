@@ -94,7 +94,7 @@ function FlowApp() {
   const [passedIds, setPassedIds] = useState(new Set());
   const [isStrictMode, setIsStrictMode] = useState(true);
   const [hidePassedEdges, setHidePassedEdges] = useState(false);
-  const [isHeatmapMode, setIsHeatmapMode] = useState(false); // NUEVO ESTADO: Mapa de Calor
+  const [isHeatmapMode, setIsHeatmapMode] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isCompact, setIsCompact] = useState(false); 
   
@@ -268,11 +268,31 @@ function FlowApp() {
       return !found; 
     });
 
+    // NUEVA LÓGICA DE CORREQUISITOS (Agrupación)
+    const adjCoreq = {};
+    Object.keys(dict).forEach(k => adjCoreq[k] = []);
+    cleanEdges.forEach(e => {
+      if (dict[e.source]?.trimester === dict[e.target]?.trimester) {
+        adjCoreq[e.source].push(e.target);
+        adjCoreq[e.target].push(e.source);
+      }
+    });
+
+    Object.keys(dict).forEach(k => {
+      const visited = new Set();
+      const q = [k];
+      visited.add(k);
+      while(q.length > 0) {
+        const curr = q.shift();
+        adjCoreq[curr].forEach(nx => {
+          if (!visited.has(nx)) { visited.add(nx); q.push(nx); }
+        });
+      }
+      dict[k].coreqGroup = Array.from(visited);
+    });
+
     const bEdges = cleanEdges.map(e => {
-      const sourceData = dict[e.source];
-      const targetData = dict[e.target];
-      const isCoreq = sourceData && targetData && sourceData.trimester === targetData.trimester;
-      
+      const isCoreq = dict[e.source]?.trimester === dict[e.target]?.trimester;
       return { id: `e-${e.source}-${e.target}`, source: e.source, target: e.target, type: 'customArch', markerEnd: { type: MarkerType.ArrowClosed }, style: isCoreq ? { strokeDasharray: '5,5' } : {} };
     });
     
@@ -283,58 +303,58 @@ function FlowApp() {
   const handleAutoFill = () => {
     if (!isSimulatorMode) return;
 
-    // 1. Crear matriz de dependencias hacia el futuro (downstream)
     const downAdj = {};
     baseGraph.edges.forEach(e => {
       if (!downAdj[e.source]) downAdj[e.source] = [];
       downAdj[e.source].push(e.target);
     });
 
-    // 2. Extraer todas las materias elegibles
-    const eligibleSubjects = [];
-    Object.keys(baseGraph.subjectDict).forEach(subjId => {
-      if (passedIds.has(subjId)) return;
-      const nData = baseGraph.subjectDict[subjId];
+    const getReachableCount = (startId) => {
+      const v = new Set(); const q = [startId];
+      while (q.length > 0) { 
+        const curr = q.shift(); 
+        (downAdj[curr] || []).forEach(nx => { 
+          if (!v.has(nx)) { v.add(nx); q.push(nx); } 
+        }); 
+      }
+      return v.size;
+    };
 
-      const isEligible = (nData.prereqs || []).every(pr => {
-        if (passedIds.has(pr)) return true;
-        const prData = baseGraph.subjectDict[pr];
-        if (prData && prData.trimester === nData.trimester) return true;
-        return false;
+    const processedGroups = new Set();
+    const eligibleGroups = [];
+    
+    Object.values(baseGraph.subjectDict).forEach(nData => {
+      if (passedIds.has(nData.code)) return;
+      const activeGroup = (nData.coreqGroup || [nData.code]).filter(gId => !passedIds.has(gId));
+      const groupId = activeGroup.sort().join(',');
+      if (processedGroups.has(groupId) || activeGroup.length === 0) return;
+      processedGroups.add(groupId);
+
+      const isEligible = activeGroup.every(gId => {
+        const gData = baseGraph.subjectDict[gId];
+        return (gData.prereqs || []).every(pr => passedIds.has(pr) || activeGroup.includes(pr));
       });
 
       if (isEligible) {
-        // Calcular peso de la materia (cuántas materias desbloquea)
-        const getReachableCount = (startId) => {
-          const v = new Set(); const q = [startId];
-          while (q.length > 0) { 
-            const curr = q.shift(); 
-            (downAdj[curr] || []).forEach(nx => { 
-              if (!v.has(nx)) { v.add(nx); q.push(nx); } 
-            }); 
-          }
-          return v.size;
-        };
-        
-        eligibleSubjects.push({ 
-          id: subjId, 
-          credits: nData.credits, 
-          weight: getReachableCount(subjId) 
+        const totalCredits = activeGroup.reduce((sum, gId) => sum + (baseGraph.subjectDict[gId]?.credits || 0), 0);
+        let maxW = 0;
+        activeGroup.forEach(gId => {
+          const w = getReachableCount(gId);
+          if (w > maxW) maxW = w;
         });
+        eligibleGroups.push({ group: activeGroup, credits: totalCredits, weight: maxW });
       }
     });
 
-    // 3. Ordenar por Peso (mayor a menor) y luego por créditos
-    eligibleSubjects.sort((a, b) => b.weight - a.weight || b.credits - a.credits);
+    eligibleGroups.sort((a, b) => b.weight - a.weight || b.credits - a.credits);
 
-    // 4. Llenar el carrito sin pasarse del límite
     let currentCredits = 0;
     const newCart = new Set();
     
-    for (const subj of eligibleSubjects) {
-      if (currentCredits + subj.credits <= simulatorLimit) {
-        newCart.add(subj.id);
-        currentCredits += subj.credits;
+    for (const g of eligibleGroups) {
+      if (currentCredits + g.credits <= simulatorLimit) {
+        g.group.forEach(gId => newCart.add(gId));
+        currentCredits += g.credits;
       }
     }
     
@@ -353,15 +373,23 @@ function FlowApp() {
 
     if (isSimulatorMode && activeTab === 'map') {
       const nData = baseGraph.subjectDict[clickedNode.id];
-      const isEligible = !passedIds.has(clickedNode.id) && (nData?.prereqs || []).every(pr => {
-        if (passedIds.has(pr)) return true;
-        const prData = baseGraph.subjectDict[pr];
-        if (prData && prData.trimester === nData.trimester) return true;
-        return false;
+      const activeGroup = (nData?.coreqGroup || [clickedNode.id]).filter(gId => !passedIds.has(gId));
+      
+      const isEligible = !passedIds.has(clickedNode.id) && activeGroup.every(gId => {
+        const gData = baseGraph.subjectDict[gId];
+        return (gData?.prereqs || []).every(pr => passedIds.has(pr) || activeGroup.includes(pr));
       });
       
       if (isEligible) {
-        setSimulatorCart(prev => { const next = new Set(prev); next.has(clickedNode.id) ? next.delete(clickedNode.id) : next.add(clickedNode.id); return next; });
+        setSimulatorCart(prev => { 
+          const next = new Set(prev); 
+          if (next.has(clickedNode.id)) {
+            activeGroup.forEach(gId => next.delete(gId));
+          } else {
+            activeGroup.forEach(gId => next.add(gId));
+          }
+          return next; 
+        });
       }
       return;
     }
@@ -388,7 +416,6 @@ function FlowApp() {
       if (!upAdj[e.target]) upAdj[e.target] = []; upAdj[e.target].push(e.source);
     });
 
-    // Lógica Mapa de Calor
     const nodeWeights = {};
     let maxWeight = 0;
     baseGraph.nodes.forEach(n => {
@@ -450,11 +477,10 @@ function FlowApp() {
           const isConnected = upstream.has(n.id) || downstream.has(n.id);
           
           const nData = baseGraph.subjectDict[n.id];
-          const isSimulatorEligible = isSimulatorMode && activeTab === 'map' && !isPassed && (nData?.prereqs || []).every(pr => {
-            if (passedIds.has(pr)) return true;
-            const prData = baseGraph.subjectDict[pr];
-            if (prData && prData.trimester === n.parentNode) return true;
-            return false;
+          const activeGroup = (nData.coreqGroup || [n.id]).filter(gId => !passedIds.has(gId));
+          const isSimulatorEligible = isSimulatorMode && activeTab === 'map' && !isPassed && activeGroup.every(gId => {
+            const gData = baseGraph.subjectDict[gId];
+            return (gData.prereqs || []).every(pr => passedIds.has(pr) || activeGroup.includes(pr));
           });
 
           const isInSimulatorCart = isSimulatorMode && activeTab === 'map' && simulatorCart.has(n.id);
@@ -472,7 +498,6 @@ function FlowApp() {
           const isSearched = searchTerm.length > 2 && (n.data.name.toLowerCase().includes(searchLower) || n.data.code.toLowerCase().includes(searchLower));
           const isSelectedForGpa = activeTab === 'gpa' && activeTermSubjectCodes.has(n.id);
 
-          // Alterar visualmente para el Mapa de Calor
           const weight = nodeWeights[n.id] || 0;
           let finalName = n.data.name;
           let heatmapStyle = {};
@@ -709,7 +734,7 @@ function FlowApp() {
              
              <div style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>
                {gpaStats.terms.map(term => {
-                  const maxCredits = term.overcredit ? 26 : 21;
+                  const maxCredits = term.maxCredits ?? (term.overcredit ? 26 : 21);
                   const isOverLimit = term.totalCreditsAttempted > maxCredits;
                   return (
                   <div key={term.id} onClick={() => setActiveGpaTermId(term.id)} style={{ background: activeGpaTermId === term.id ? (isDarkMode ? '#1e3a8a' : '#f0f9ff') : (isDarkMode ? '#1e293b' : '#f8fafc'), border: `2px solid ${activeGpaTermId === term.id ? '#3b82f6' : borderPanel}`, borderRadius: '12px', padding: '12px', cursor: 'pointer' }}>
@@ -729,7 +754,9 @@ function FlowApp() {
                         <>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', margin: '10px 0' }}>
                             <span style={{ color: isOverLimit ? '#ef4444' : '#64748b', fontWeight: isOverLimit ? 'bold' : 'normal' }}>Créditos: {term.totalCreditsAttempted} / {maxCredits}</span>
-                            <label><input type="checkbox" checked={term.overcredit} onChange={() => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, overcredit: !t.overcredit } : t))} /> 26 CR</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              Límite: <input type="number" value={term.maxCredits ?? (term.overcredit ? 26 : 21)} onChange={(e) => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, maxCredits: parseInt(e.target.value) || 0 } : t))} style={{ width: '40px', background: 'transparent', color: textPanel, border: 'none', borderBottom: `1px solid ${borderPanel}`, outline: 'none', textAlign: 'center', fontWeight: 'bold' }} /> CR
+                            </div>
                           </div>
                           <div style={{ display: 'flex', gap: '5px', marginBottom: '10px', alignItems: 'center' }}>
                             <button onClick={(e) => { e.stopPropagation(); loadOfficialTrimester(term.id); }} style={{ flex: 1, fontSize: '11px', padding: '6px', background: isDarkMode ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cargar Pensum</button>
@@ -857,7 +884,7 @@ function FlowApp() {
                   <h4 style={{ margin: '0 0 5px 0', color: '#f59e0b', fontSize: isMobile ? '11px' : '13px' }}>SIMULADOR ACTIVO</h4>
                   <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '900', color: simulatorData.simCredits > simulatorLimit ? '#ef4444' : textPanel, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
                     {simulatorData.simCredits} / 
-                    <input type="number" value={simulatorLimit} onChange={(e) => { setSimulatorLimit(e.target.value); localStorage.setItem('pensum_sim_limit', e.target.value); }} style={{ width: '35px', fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', background: 'transparent', border: 'none', borderBottom: `2px dashed ${simulatorData.simCredits > simulatorLimit ? '#ef4444' : '#64748b'}`, outline: 'none', textAlign: 'center', padding: 0 }} /> CR
+                    <input type="number" value={simulatorLimit} onChange={(e) => { setSimulatorLimit(e.target.value); localStorage.setItem('pensum_sim_limit', e.target.value); }} style={{ width: '45px', fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', background: 'transparent', border: 'none', borderBottom: `2px dashed ${simulatorData.simCredits > simulatorLimit ? '#ef4444' : '#64748b'}`, outline: 'none', textAlign: 'center', padding: 0 }} /> CR
                   </div>
                   {!isMobile && <p style={{ fontSize: '11px', color: '#64748b', margin: '5px 0 0 0' }}>Haz clic en las materias naranjas para armar tu trimestre.</p>}
                   
