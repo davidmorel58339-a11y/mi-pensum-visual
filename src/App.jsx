@@ -1,6 +1,6 @@
-import { Analytics } from '@vercel/analytics/react';
 import React, { useState, useCallback, useRef, useEffect, useMemo, Component } from 'react';
 import ReactFlow, { Background, Controls, MarkerType, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, ReactFlowProvider } from 'reactflow';
+import { Analytics } from '@vercel/analytics/react';
 import 'reactflow/dist/style.css';
 import SubjectNode from './SubjectNode';
 import TrimesterNode from './TrimesterNode';
@@ -110,6 +110,7 @@ function FlowApp() {
   const [focusModeId, setFocusModeId] = useState(null);
   
   const [isSimulatorMode, setIsSimulatorMode] = useState(false);
+  const isSimulatorModeRef = useRef(false); // NUEVO REF: Para interceptar la casilla en el simulador
   const [simulatorCart, setSimulatorCart] = useState(new Set());
   const [gpaTerms, setGpaTerms] = useState([]); 
   const [activeGpaTermId, setActiveGpaTermId] = useState(null); 
@@ -150,6 +151,11 @@ function FlowApp() {
     }
   }, []);
 
+  // Mantener actualizado el ref del simulador
+  useEffect(() => {
+    isSimulatorModeRef.current = isSimulatorMode;
+  }, [isSimulatorMode]);
+
   // --- WINDOW RESIZE LISTENER ---
   useEffect(() => {
     const handleResize = () => {
@@ -183,6 +189,11 @@ function FlowApp() {
   }, [resize, stopResizing]);
 
   const handleToggleSubject = useCallback((id, checked) => {
+    // NUEVA LÓGICA: Bloquear el uso de la casilla durante el Modo Simulador
+    if (isSimulatorModeRef.current) {
+      alert("💡 MODO SIMULADOR\n\nPara agregar materias a tu simulación, haz clic en el RECTÁNGULO de la materia, no en esta casilla.\n\nLa casilla sirve únicamente para marcar las materias que ya aprobaste en la vida real.");
+      return; 
+    }
     setPassedIds(prev => { const next = new Set(prev); checked ? next.add(id) : next.delete(id); localStorage.setItem('pensum_passed', JSON.stringify([...next])); return next; });
     setSimulatorCart(prev => { const next = new Set(prev); next.delete(id); return next; }); 
     setGoalSubjects(prev => { const next = new Set(prev); next.delete(id); return next; }); 
@@ -206,7 +217,7 @@ function FlowApp() {
     const matches = nodes.filter(n => n.type === 'subject' && (n.data.name.toLowerCase().includes(term) || n.data.code.toLowerCase().includes(term)));
     if (matches.length === 1 && rfInstance) {
       rfInstance.fitView({ nodes: [{ id: matches[0].id }], duration: 800, maxZoom: 1.2 });
-      if (isMobile) setSidebarOpen(false); // Cierra menú al buscar en móvil
+      if (isMobile) setSidebarOpen(false); 
     }
   };
 
@@ -225,7 +236,6 @@ function FlowApp() {
         if (parts.length >= 2) {
           const prereqs = parts[2] ? parts[2].split(',').map(s => s.trim()).filter(s => s !== '') : [];
           const credits = parseInt(parts[3]) || 0;
-          // Guardamos el "trimester" para la lógica de correquisitos
           const subjData = { code: parts[0], name: parts[1], prereqs, credits, trimester: currentTId };
           trimesters[trimesters.length - 1].subjects.push(subjData);
           dict[parts[0]] = subjData;
@@ -257,7 +267,6 @@ function FlowApp() {
     });
 
     const bEdges = cleanEdges.map(e => {
-      // Línea punteada visual para cualquier par de materias en el mismo trimestre
       const sourceData = dict[e.source];
       const targetData = dict[e.target];
       const isCoreq = sourceData && targetData && sourceData.trimester === targetData.trimester;
@@ -282,7 +291,6 @@ function FlowApp() {
       const nData = baseGraph.subjectDict[clickedNode.id];
       const isEligible = !passedIds.has(clickedNode.id) && (nData?.prereqs || []).every(pr => {
         if (passedIds.has(pr)) return true;
-        // NUEVA LÓGICA DE CORREQUISITOS INTELIGENTE
         const prData = baseGraph.subjectDict[pr];
         if (prData && prData.trimester === nData.trimester) return true;
         return false;
@@ -309,7 +317,6 @@ function FlowApp() {
     } else { setHighlightedNodeId(clickedNode.id); }
   }, [activeTab, activeGpaTermId, isSimulatorMode, passedIds, baseGraph.subjectDict]);
 
-  // --- LÓGICA DERIVADA SEGURA ---
   const derivedData = useMemo(() => {
     let upAdj = {}; let downAdj = {};
     baseGraph.edges.forEach(e => {
@@ -362,7 +369,6 @@ function FlowApp() {
           const isTarget = n.id === targetId;
           const isConnected = upstream.has(n.id) || downstream.has(n.id);
           
-          // Lógica de Simulador con Correquisitos
           const nData = baseGraph.subjectDict[n.id];
           const isSimulatorEligible = isSimulatorMode && activeTab === 'map' && !isPassed && (nData?.prereqs || []).every(pr => {
             if (passedIds.has(pr)) return true;
@@ -428,7 +434,6 @@ function FlowApp() {
         opacity = 0.10;
       }
 
-      // OVERRIDE: Ocultar completamente las flechas de origen aprobado si el usuario lo pide
       if (hidePassedEdges && isSourcePassed) {
         isHidden = true;
         opacity = 0;
@@ -544,7 +549,6 @@ function FlowApp() {
           
           {activeTab === 'map' && (
             <>
-              {/* GUÍA DE INTELIGENCIA ARTIFICIAL */}
               <div style={{ padding: '12px', background: isDarkMode ? '#334155' : '#f1f5f9', borderRadius: '8px', marginBottom: '15px', fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#475569', border: `1px solid ${borderPanel}` }}>
                 <b style={{ color: textPanel }}>Genera tu Pensum con IA 🤖</b><br/>
                 Copia este prompt y pégalo en ChatGPT/Claude junto al PDF de tu plan de estudios:<br/><br/>
@@ -560,12 +564,15 @@ function FlowApp() {
               
               <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                 <button onClick={() => { parseTextToGraph(inputText); if(isMobile) setSidebarOpen(false); }} style={{ flex: 1, padding: '12px', background: isDarkMode ? '#3b82f6' : '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>Renderizar Pensum</button>
-                <button onClick={() => { setIsSimulatorMode(!isSimulatorMode); if(isMobile && !isSimulatorMode) setSidebarOpen(false); }} style={{ flex: 1, padding: '12px', background: isSimulatorMode ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>
+                <button onClick={() => { 
+                  if (isSimulatorMode) setSimulatorCart(new Set()); // NUEVA LÓGICA: Vacia el carrito al salir
+                  setIsSimulatorMode(!isSimulatorMode); 
+                  if(isMobile && !isSimulatorMode) setSidebarOpen(false); 
+                }} style={{ flex: 1, padding: '12px', background: isSimulatorMode ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>
                   {isSimulatorMode ? `SALIR SIM (${simulatorData.simCredits} CR)` : 'Simulador 🛒'}
                 </button>
               </div>
               
-              {/* SLIDER DE PENSUMS PRECARGADOS */}
               <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '5px', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch' }}>
                 <button onClick={() => setInputText(PRELOADED_PENSUMS.IBM_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer' }}>IBM 2020</button>
                 <button onClick={() => setInputText(PRELOADED_PENSUMS.IMC_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer' }}>IMC 2020</button>
@@ -745,7 +752,7 @@ function FlowApp() {
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold', marginBottom: '6px' }}>
-                    Bloqueo de materias con pre-req incumplidos 🔒
+                    Bloqueo Estricto 🔒
                     <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
                   </label>
 
@@ -771,7 +778,6 @@ export default function App() {
     <ReactFlowProvider>
       <ErrorBoundary>
         <FlowApp />
-        {/* Vercel Analytics Component */}
         <Analytics /> 
       </ErrorBoundary>
     </ReactFlowProvider>
