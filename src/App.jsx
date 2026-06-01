@@ -11,6 +11,17 @@ const edgeTypes = { customArch: CustomEdge };
 const gradingScale = { 'A+': 4.00, 'A': 3.75, 'B+': 3.50, 'B': 3.00, 'C+': 2.50, 'C': 2.00, 'D': 1.00, 'F': 0.00 };
 
 // ==========================================
+// MOTOR DE TEMAS (SKINS)
+// ==========================================
+const THEMES = {
+  light: { id: 'light', icon: '☀️', bg: '#f1f5f9', panel: '#ffffff', text: '#1e293b', border: '#e2e8f0', primary: '#3b82f6', isDark: false, e1: '#4f46e5', e2: '#059669', e3: '#e11d48' },
+  dark: { id: 'dark', icon: '🌙', bg: '#020617', panel: '#0f172a', text: '#f8fafc', border: '#334155', primary: '#3b82f6', isDark: true, e1: '#818cf8', e2: '#34d399', e3: '#fb7185' },
+  matrix: { id: 'matrix', icon: '💻', bg: '#000000', panel: '#0a0a0a', text: '#22c55e', border: '#166534', primary: '#22c55e', isDark: true, e1: '#22c55e', e2: '#16a34a', e3: '#4ade80' },
+  cyberpunk: { id: 'cyberpunk', icon: '🌃', bg: '#2b0947', panel: '#1a052e', text: '#fdf4ff', border: '#d946ef', primary: '#00ffff', isDark: true, e1: '#00ffff', e2: '#d946ef', e3: '#f43f5e' }
+};
+const THEME_KEYS = Object.keys(THEMES);
+
+// ==========================================
 // BASE DE DATOS DE PENSUMS PRECARGADOS
 // ==========================================
 const PRELOADED_PENSUMS = {
@@ -55,29 +66,28 @@ class ErrorBoundary extends Component {
 // ==========================================
 // COMPONENTE DEL PANEL DE AYUDA (Responsive)
 // ==========================================
-function HelpPanel({ isDarkMode, isMobile }) {
+function HelpPanel({ currentTheme, isMobile }) {
   const [isOpen, setIsOpen] = useState(false);
-  const bg = isDarkMode ? '#7f1d1d' : '#ef4444';
+  const bg = currentTheme.primary;
 
   return (
     <div style={{ position: 'absolute', top: 15, right: 15, zIndex: 1000 }}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        style={{ background: bg, color: 'white', border: 'none', padding: isMobile ? '8px 12px' : '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.2)', transition: 'background 0.2s', fontSize: isMobile ? '12px' : '14px' }}
+        style={{ background: bg, color: currentTheme.isDark ? '#000' : '#fff', border: 'none', padding: isMobile ? '8px 12px' : '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.2)', transition: 'background 0.2s', fontSize: isMobile ? '12px' : '14px' }}
       >
         {isOpen ? 'Cerrar Guía' : '¿Cómo usarlo? 📖'}
       </button>
       
       {isOpen && (
-        <div style={{ marginTop: '10px', width: isMobile ? '260px' : '320px', background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', border: `2px solid ${bg}`, boxShadow: '0 10px 15px rgba(0,0,0,0.3)', color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
-          <h4 style={{ margin: '0 0 10px 0', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`, paddingBottom: '5px', fontSize: isMobile ? '13px' : '15px' }}>Funciones Principales:</h4>
+        <div style={{ marginTop: '10px', width: isMobile ? '260px' : '320px', background: currentTheme.panel, padding: '15px', borderRadius: '12px', border: `2px solid ${bg}`, boxShadow: '0 10px 15px rgba(0,0,0,0.3)', color: currentTheme.text }}>
+          <h4 style={{ margin: '0 0 10px 0', borderBottom: `1px solid ${currentTheme.border}`, paddingBottom: '5px', fontSize: isMobile ? '13px' : '15px' }}>Funciones Principales:</h4>
           <ul style={{ fontSize: isMobile ? '11.5px' : '12.5px', paddingLeft: '20px', lineHeight: '1.6', margin: 0 }}>
-            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Doble clic en una materia para aislar su ruta de prerrequisitos.</li>
-            <li style={{ marginBottom: '6px' }}><b>Calculadora GPA:</b> (Pestaña GPA) Calcula tu índice general y por trimestre cargando tus notas.</li>
+            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Doble clic en una materia para aislar su ruta de prerrequisitos de forma cinematográfica.</li>
             <li style={{ marginBottom: '6px' }}><b>Simulador 🛒:</b> Selecciona materias para armar tu trimestre ideal sin pasarte del límite.</li>
             <li style={{ marginBottom: '6px' }}><b>Auto-Llenar ⚡:</b> Arma el trimestre priorizando las materias más críticas según el Mapa de Calor.</li>
             <li style={{ marginBottom: '6px' }}><b>Planes A/B:</b> Guarda y compara diferentes combinaciones en el simulador.</li>
-            <li><b>Meta GPA:</b> Calcula exactamente qué notas necesitas para alcanzar tu índice soñado.</li>
+            <li><b>Temas Personalizados:</b> Haz clic en el sol/luna (☀️) para cambiar los colores de la aplicación.</li>
           </ul>
         </div>
       )}
@@ -96,7 +106,10 @@ function FlowApp() {
   const [isStrictMode, setIsStrictMode] = useState(true);
   const [hidePassedEdges, setHidePassedEdges] = useState(false);
   const [isHeatmapMode, setIsHeatmapMode] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // Nuevo Estado: Tema Activo
+  const [activeTheme, setActiveTheme] = useState('light');
+  
   const [isCompact, setIsCompact] = useState(false); 
   
   // --- RESPONSIVE STATE ---
@@ -135,10 +148,11 @@ function FlowApp() {
       const sStrict = localStorage.getItem('pensum_strict');
       const sHidePassedEdges = localStorage.getItem('pensum_hide_passed_edges');
       const sSimLimit = localStorage.getItem('pensum_sim_limit'); 
-      const sGpaTerms = localStorage.getItem('pensum_gpa');
-      const sDark = localStorage.getItem('pensum_dark');
+      const sTheme = localStorage.getItem('pensum_theme');
+      const sDark = localStorage.getItem('pensum_dark'); // Legacy fallback
       const sCompact = localStorage.getItem('pensum_compact');
       const sScenarios = localStorage.getItem('pensum_scenarios');
+      const sGpaTerms = localStorage.getItem('pensum_gpa');
       
       if (sText) { setInputText(sText); parseTextToGraph(sText); }
       else { parseTextToGraph(PRELOADED_PENSUMS.IBM_2020); }
@@ -147,7 +161,11 @@ function FlowApp() {
       if (sStrict !== null) setIsStrictMode(JSON.parse(sStrict));
       if (sHidePassedEdges !== null) setHidePassedEdges(JSON.parse(sHidePassedEdges));
       if (sSimLimit !== null) setSimulatorLimit(parseInt(sSimLimit));
-      if (sDark !== null) setIsDarkMode(JSON.parse(sDark));
+      
+      // Theme Persistencia
+      if (sTheme && THEMES[sTheme]) setActiveTheme(sTheme);
+      else if (sDark !== null) setActiveTheme(JSON.parse(sDark) ? 'dark' : 'light');
+
       if (sCompact !== null) setIsCompact(JSON.parse(sCompact));
       if (sScenarios) {
         const parsed = JSON.parse(sScenarios);
@@ -185,7 +203,16 @@ function FlowApp() {
   }, []);
 
   const saveGpaTerms = (newTerms) => { setGpaTerms(newTerms); localStorage.setItem('pensum_gpa', JSON.stringify(newTerms)); };
-  const toggleDarkMode = () => { setIsDarkMode(p => { const v = !p; localStorage.setItem('pensum_dark', v); return v; }); };
+  
+  // FUNCION DE TEMA ROTATIVO
+  const toggleTheme = () => {
+    setActiveTheme(prev => {
+      const nextIdx = (THEME_KEYS.indexOf(prev) + 1) % THEME_KEYS.length;
+      localStorage.setItem('pensum_theme', THEME_KEYS[nextIdx]);
+      return THEME_KEYS[nextIdx];
+    });
+  };
+
   const toggleCompactMode = () => { setIsCompact(p => { const v = !p; localStorage.setItem('pensum_compact', v); return v; }); };
 
   const startResizing = useCallback(() => { if (!isMobile) isResizing.current = true; }, [isMobile]);
@@ -254,7 +281,7 @@ function FlowApp() {
     });
 
     trimesters.forEach(tri => {
-      bNodes.push({ id: tri.id, type: 'trimester', data: { label: tri.label, subjectIds: tri.subjects.map(s => s.code), isDarkMode, onToggleAll: (checked) => handleToggleMultiple(tri.subjects.map(s => s.code), checked) }, position: { x: (tri.index - 1) * 460, y: 0 }, zIndex: -1, style: { width: 280, height: 100 } });
+      bNodes.push({ id: tri.id, type: 'trimester', data: { label: tri.label, subjectIds: tri.subjects.map(s => s.code), isDarkMode: THEMES[activeTheme].isDark, onToggleAll: (checked) => handleToggleMultiple(tri.subjects.map(s => s.code), checked) }, position: { x: (tri.index - 1) * 460, y: 0 }, zIndex: -1, style: { width: 280, height: 100 } });
       tri.subjects.forEach(subj => {
         bNodes.push({ id: subj.code, type: 'subject', data: { code: subj.code, name: subj.name, credits: subj.credits, prereqs: subj.prereqs }, parentNode: tri.id, extent: 'parent', zIndex: 10, position: { x: 25, y: 0 }, });
         subj.prereqs.forEach(pr => { rawEdges.push({ source: pr, target: subj.code }); });
@@ -306,7 +333,6 @@ function FlowApp() {
     setBaseGraph({ nodes: bNodes, edges: bEdges, subjectDict: dict, trimestersList: trimesters });
   };
 
-  // --- MANEJO DE ESCENARIOS ---
   const saveScenario = (planName) => {
     if (simulatorCart.size === 0) {
       alert(`No tienes materias seleccionadas para guardar en el Plan ${planName}.`);
@@ -332,7 +358,6 @@ function FlowApp() {
   };
 
 
-  // --- LÓGICA AUTOCOMPLETADO (SPEEDRUN MODE) ---
   const handleAutoFill = () => {
     if (!isSimulatorMode) return;
 
@@ -342,7 +367,6 @@ function FlowApp() {
       downAdj[e.source].push(e.target);
     });
 
-    // Lógica Topológica para calcular el Peso (Misma del Mapa de Calor)
     const getReachableCount = (startId) => {
       const v = new Set(); const q = [startId];
       while (q.length > 0) { 
@@ -380,7 +404,6 @@ function FlowApp() {
       }
     });
 
-    // Ordenar por Peso (para agarrar los Cuellos de Botella primero)
     eligibleGroups.sort((a, b) => b.weight - a.weight || b.credits - a.credits);
 
     let currentCredits = 0;
@@ -485,6 +508,7 @@ function FlowApp() {
     const activeGpaTerm = gpaTerms.find(t => t.id === activeGpaTermId);
     const activeTermSubjectCodes = activeGpaTerm ? new Set((activeGpaTerm.subjects || []).map(s => s.code)) : new Set();
     const nodeH = isCompact ? 55 : 90; const trimestersHeights = {};
+    const currentTheme = THEMES[activeTheme];
 
     const dNodes = baseGraph.nodes.map(n => {
       if (n.type === 'subject') {
@@ -549,33 +573,44 @@ function FlowApp() {
             };
           }
 
+          // LÓGICA MODO ENFOQUE CINEMATOGRÁFICO
+          let cinematicStyle = {};
+          if (focusModeId) {
+            if (isDimmed) {
+              cinematicStyle = { filter: 'blur(5px) grayscale(80%)', opacity: 0.3, pointerEvents: 'none', transition: 'all 0.4s ease' };
+            } else {
+              cinematicStyle = { boxShadow: `0 0 25px 5px ${currentTheme.primary}AA`, zIndex: 1000, transition: 'all 0.4s ease', transform: 'scale(1.02)' };
+            }
+          }
+
           return { 
             ...n, 
-            hidden: focusModeId && isDimmed, 
+            hidden: false, // Ya no ocultamos, usamos blur y opacity
             position: { x: 25, y: newY },
-            style: { ...n.style, ...heatmapStyle },
+            style: { ...n.style, ...heatmapStyle, ...cinematicStyle },
             data: { 
               ...n.data, name: finalName,
-              isDarkMode, isCompact, isPassed, isLocked, isHighlighted: isTarget, isDimmed, isSearched, isSelectedForGpa, isSelectedForGoal, isSimulatorEligible, isInSimulatorCart, onToggle: handleToggleSubject, onDoubleClick: handleDoubleClick 
+              isDarkMode: currentTheme.isDark, isCompact, isPassed, isLocked, isHighlighted: isTarget, isDimmed, isSearched, isSelectedForGpa, isSelectedForGoal, isSimulatorEligible, isInSimulatorCart, onToggle: handleToggleSubject, onDoubleClick: handleDoubleClick 
             } 
           };
         }
       }
-      return { ...n, data: { ...n.data, isDarkMode } };
+      return { ...n, data: { ...n.data, isDarkMode: currentTheme.isDark } };
     });
 
     const finalDNodes = dNodes.map(n => {
       if (n.type === 'trimester' && trimestersHeights[n.id]) {
-        return { ...n, style: { ...n.style, height: trimestersHeights[n.id] }, data: { ...n.data, stats: triStats[n.id] || { total: 0, passed: 0 } } };
+        let cinematicStyle = {};
+        if (focusModeId) cinematicStyle = { filter: 'blur(3px) grayscale(50%)', opacity: 0.5, transition: 'all 0.4s ease' };
+        return { ...n, style: { ...n.style, height: trimestersHeights[n.id], ...cinematicStyle }, data: { ...n.data, isDarkMode: currentTheme.isDark, stats: triStats[n.id] || { total: 0, passed: 0 } } };
       }
       return n;
     });
 
-    const edgeColors = { '1': isDarkMode ? '#818cf8' : '#4f46e5', '2': isDarkMode ? '#34d399' : '#059669', '3': isDarkMode ? '#fb7185' : '#e11d48' };
     const dEdges = baseGraph.edges.map(e => {
       const lvlMatch = e.source.match(/\d/);
       const level = lvlMatch ? lvlMatch[0] : '1';
-      const color = edgeColors[level] || (isDarkMode ? '#64748b' : '#94a3b8');
+      const color = currentTheme[`e${level}`] || currentTheme.border;
       
       const isSourcePassed = passedIds.has(e.source);
       const isPassed = isSourcePassed || passedIds.has(e.target);
@@ -583,26 +618,31 @@ function FlowApp() {
       const isDownEdge = targetId && (downstream.has(e.source) || e.source === targetId) && (downstream.has(e.target) || e.target === targetId);
       const isActiveHighlight = isUpEdge || isDownEdge;
 
-      let opacity = isDarkMode ? 0.6 : 0.8;
-      let isHidden = false;
+      let opacity = currentTheme.isDark ? 0.6 : 0.8;
+      let strokeWidth = 2;
+      let filter = 'none';
 
       if (activeTab === 'goal' || (isSimulatorMode && activeTab === 'map') || (activeTab === 'gpa' && activeGpaTermId)) {
         opacity = 0.05;
       } else if (focusModeId) {
-        opacity = isActiveHighlight ? 1 : 0;
-        if (!isActiveHighlight) isHidden = true;
+        if (isActiveHighlight) {
+          opacity = 1;
+          strokeWidth = 4;
+          filter = `drop-shadow(0px 0px 4px ${color})`; // NEON GLOW PARA FLECHAS
+        } else {
+          opacity = 0; // Desaparecer flechas no enfocadas
+        }
       } else if (highlightedNodeId) {
         opacity = isActiveHighlight ? 1 : 0.05;
       } else if (isPassed) {
         opacity = 0.10;
       }
 
-      if (hidePassedEdges && isSourcePassed) {
-        isHidden = true;
+      if (hidePassedEdges && isSourcePassed && !focusModeId) {
         opacity = 0;
       }
 
-      return { ...e, animated: targetId ? isActiveHighlight : (e.style?.strokeDasharray ? true : !isPassed), hidden: isHidden, style: { ...e.style, stroke: color, opacity, strokeWidth: isActiveHighlight ? 4 : 2 }, markerEnd: { type: MarkerType.ArrowClosed, color } };
+      return { ...e, animated: targetId ? isActiveHighlight : (e.style?.strokeDasharray ? true : !isPassed), hidden: opacity === 0, style: { ...e.style, stroke: color, opacity, strokeWidth, filter, transition: 'all 0.4s ease' }, markerEnd: { type: MarkerType.ArrowClosed, color } };
     });
     
     return { 
@@ -610,13 +650,17 @@ function FlowApp() {
       progress: { pCredits, tCredits, remainingCrd: tCredits - pCredits, percent: tCredits === 0 ? 0 : Math.round((pCredits / tCredits) * 100), c100, c200, c300 }, 
       simulatorData: { simCredits }, goalTotalCrd: localGoalTotalCrd 
     };
-  }, [baseGraph, passedIds, highlightedNodeId, focusModeId, searchTerm, isStrictMode, hidePassedEdges, isHeatmapMode, activeTab, activeGpaTermId, gpaTerms, isDarkMode, isCompact, isSimulatorMode, simulatorCart, goalSubjects, handleToggleSubject, handleDoubleClick]);
+  }, [baseGraph, passedIds, highlightedNodeId, focusModeId, searchTerm, isStrictMode, hidePassedEdges, isHeatmapMode, activeTab, activeGpaTermId, gpaTerms, activeTheme, isCompact, isSimulatorMode, simulatorCart, goalSubjects, handleToggleSubject, handleDoubleClick]);
 
   useEffect(() => {
     setNodes(derivedData.dNodes); setEdges(derivedData.dEdges);
   }, [derivedData.dNodes, derivedData.dEdges]);
 
   const { progress, simulatorData, goalTotalCrd } = derivedData;
+  const currentTheme = THEMES[activeTheme];
+  const bgPanel = currentTheme.panel;
+  const textPanel = currentTheme.text;
+  const borderPanel = currentTheme.border;
 
   const gpaStats = useMemo(() => {
     let gPts = 0; let gCrd = 0;
@@ -660,18 +704,14 @@ function FlowApp() {
   const onNodesChange = useCallback((c) => setNodes(n => applyNodeChanges(c, n)), []);
   const onEdgesChange = useCallback((c) => setEdges(e => applyEdgeChanges(c, e)), []);
 
-  const bgPanel = isDarkMode ? '#0f172a' : '#ffffff';
-  const textPanel = isDarkMode ? '#f8fafc' : '#1e293b';
-  const borderPanel = isDarkMode ? '#334155' : '#e2e8f0';
-
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100%', fontFamily: 'sans-serif', backgroundColor: isDarkMode ? '#020617' : '#f1f5f9', userSelect: isResizing.current ? 'none' : 'auto', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100%', fontFamily: 'sans-serif', backgroundColor: focusModeId ? (currentTheme.isDark ? '#000' : '#d1d5db') : currentTheme.bg, userSelect: isResizing.current ? 'none' : 'auto', overflow: 'hidden', transition: 'background-color 0.5s ease' }}>
       
       {/* BOTON FLOTANTE MOBILE PARA ABRIR MENU */}
       {isMobile && !sidebarOpen && (
         <button 
           onClick={() => setSidebarOpen(true)}
-          style={{ position: 'absolute', top: 15, left: 15, zIndex: 100, background: isDarkMode ? '#1e293b' : 'white', color: textPanel, border: `1px solid ${borderPanel}`, padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+          style={{ position: 'absolute', top: 15, left: 15, zIndex: 100, background: bgPanel, color: textPanel, border: `1px solid ${borderPanel}`, padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
         >
           ☰ Menú
         </button>
@@ -689,98 +729,96 @@ function FlowApp() {
         flexDirection: 'column', 
         zIndex: isMobile ? 2000 : 10, 
         color: textPanel,
-        boxShadow: isMobile ? '10px 0 25px rgba(0,0,0,0.5)' : 'none'
+        boxShadow: isMobile ? '10px 0 25px rgba(0,0,0,0.5)' : 'none',
+        transition: 'background-color 0.3s, color 0.3s, border-color 0.3s'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', background: isDarkMode ? '#1e293b' : '#f8fafc', borderBottom: `1px solid ${borderPanel}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#f8fafc', borderBottom: `1px solid ${borderPanel}` }}>
           <div style={{ display: 'flex', gap: '5px' }}>
             <button onClick={resetProgress} style={{ fontSize: '11px', padding: '6px 10px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset</button>
-            {isMobile && <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', padding: '6px 10px', background: isDarkMode ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar</button>}
+            {isMobile && <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', padding: '6px 10px', background: currentTheme.isDark ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar</button>}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {/* BOTÓN MAPA DE CALOR: SOLO VISIBLE EN SIMULADOR */}
             {isSimulatorMode && (
               <button onClick={() => setIsHeatmapMode(!isHeatmapMode)} title="Mapa de Calor (Cuellos de Botella)" style={{ fontSize: '16px', background: isHeatmapMode ? '#ef4444' : 'transparent', color: isHeatmapMode ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px', transition: 'background 0.3s' }}>🔥</button>
             )}
-            <button onClick={toggleCompactMode} title="Modo Compacto" style={{ fontSize: '16px', background: isCompact ? '#3b82f6' : 'transparent', color: isCompact ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>🗜️</button>
-            <button onClick={toggleDarkMode} title="Modo Oscuro" style={{ fontSize: '16px', background: 'transparent', border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>{isDarkMode ? '☀️' : '🌙'}</button>
+            <button onClick={toggleCompactMode} title="Modo Compacto" style={{ fontSize: '16px', background: isCompact ? currentTheme.primary : 'transparent', color: isCompact ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>🗜️</button>
+            {/* BOTÓN MOTOR DE TEMAS */}
+            <button onClick={toggleTheme} title="Cambiar Tema" style={{ fontSize: '16px', background: 'transparent', border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>{currentTheme.icon}</button>
           </div>
         </div>
 
         <div style={{ display: 'flex', borderBottom: `1px solid ${borderPanel}` }}>
-          <button onClick={() => { setActiveTab('map'); setActiveGpaTermId(null); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'map' ? bgPanel : 'transparent', color: activeTab === 'map' ? textPanel : '#64748b', borderBottom: activeTab === 'map' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>MAPA</button>
-          <button onClick={() => { setActiveTab('gpa'); setIsSimulatorMode(false); setIsHeatmapMode(false); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'gpa' ? bgPanel : 'transparent', color: activeTab === 'gpa' ? textPanel : '#64748b', borderBottom: activeTab === 'gpa' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>GPA</button>
-          <button onClick={() => { setActiveTab('goal'); setIsSimulatorMode(false); setIsHeatmapMode(false); setActiveGpaTermId(null); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'goal' ? bgPanel : 'transparent', color: activeTab === 'goal' ? textPanel : '#64748b', borderBottom: activeTab === 'goal' ? `3px solid ${textPanel}` : '3px solid transparent', cursor: 'pointer' }}>META GPA</button>
+          <button onClick={() => { setActiveTab('map'); setActiveGpaTermId(null); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'map' ? bgPanel : 'transparent', color: activeTab === 'map' ? currentTheme.primary : '#64748b', borderBottom: activeTab === 'map' ? `3px solid ${currentTheme.primary}` : '3px solid transparent', cursor: 'pointer', transition: 'all 0.2s' }}>MAPA</button>
+          <button onClick={() => { setActiveTab('gpa'); setIsSimulatorMode(false); setIsHeatmapMode(false); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'gpa' ? bgPanel : 'transparent', color: activeTab === 'gpa' ? currentTheme.primary : '#64748b', borderBottom: activeTab === 'gpa' ? `3px solid ${currentTheme.primary}` : '3px solid transparent', cursor: 'pointer', transition: 'all 0.2s' }}>GPA</button>
+          <button onClick={() => { setActiveTab('goal'); setIsSimulatorMode(false); setIsHeatmapMode(false); setActiveGpaTermId(null); }} style={{ flex: 1, padding: '15px 0', fontSize: '11px', fontWeight: 'bold', border: 'none', background: activeTab === 'goal' ? bgPanel : 'transparent', color: activeTab === 'goal' ? currentTheme.primary : '#64748b', borderBottom: activeTab === 'goal' ? `3px solid ${currentTheme.primary}` : '3px solid transparent', cursor: 'pointer', transition: 'all 0.2s' }}>META GPA</button>
         </div>
 
         <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', flexGrow: 1, overflowY: 'auto' }}>
           
           {activeTab === 'map' && (
             <>
-              <div style={{ padding: '12px', background: isDarkMode ? '#334155' : '#f1f5f9', borderRadius: '8px', marginBottom: '15px', fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#475569', border: `1px solid ${borderPanel}` }}>
+              <div style={{ padding: '12px', background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#f1f5f9', borderRadius: '8px', marginBottom: '15px', fontSize: '11px', color: currentTheme.isDark ? '#cbd5e1' : '#475569', border: `1px solid ${borderPanel}` }}>
                 <b style={{ color: textPanel }}>Genera tu Pensum con IA 🤖</b><br/>
                 Copia este prompt y pégalo en ChatGPT/Claude junto al PDF de tu plan de estudios:<br/><br/>
-                <span style={{ display: 'block', padding: '8px', background: isDarkMode ? '#0f172a' : '#ffffff', border: `1px solid ${borderPanel}`, borderRadius: '6px', userSelect: 'all', fontStyle: 'italic', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                <span style={{ display: 'block', padding: '8px', background: currentTheme.isDark ? 'rgba(0,0,0,0.4)' : '#ffffff', border: `1px solid ${borderPanel}`, borderRadius: '6px', userSelect: 'all', fontStyle: 'italic', color: currentTheme.isDark ? '#94a3b8' : '#64748b' }}>
                   "Actúa como un estructurador de datos. Convierte este pensum al formato exacto: '# Trimestre [N]' seguido de las materias así: 'CLAVE | Nombre | Prerequisitos separados por coma | Créditos'. Si no hay prerequisitos, deja el espacio vacío. Coloca los laboratorios debajo de su teoría. No agregues saludos ni explicaciones."
                 </span>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                <input type="text" placeholder="🔍 Buscar (Ej. IBI305)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flexGrow: 1, padding: '10px', borderRadius: '8px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, fontSize: '13px' }} />
-                <button onClick={handleSearchClick} style={{ width: '40px', background: '#eab308', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px' }}>🎯</button>
+                <input type="text" placeholder="🔍 Buscar (Ej. IBI305)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flexGrow: 1, padding: '10px', borderRadius: '8px', border: `1px solid ${borderPanel}`, background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: textPanel, fontSize: '13px' }} />
+                <button onClick={handleSearchClick} style={{ width: '40px', background: '#eab308', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px' }}>🎯</button>
               </div>
               
               <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                 {!isSimulatorMode && (
-                  <button onClick={() => { parseTextToGraph(inputText); if(isMobile) setSidebarOpen(false); }} style={{ flex: 1, padding: '12px', background: isDarkMode ? '#3b82f6' : '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>Renderizar Pensum</button>
+                  <button onClick={() => { parseTextToGraph(inputText); if(isMobile) setSidebarOpen(false); }} style={{ flex: 1, padding: '12px', background: currentTheme.primary, color: currentTheme.isDark ? '#000' : '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>Renderizar Pensum</button>
                 )}
                 <button onClick={() => { 
-                  if (isSimulatorMode) {
-                    setSimulatorCart(new Set()); 
-                    setIsHeatmapMode(false); 
-                  }
+                  if (isSimulatorMode) { setSimulatorCart(new Set()); setIsHeatmapMode(false); }
                   setIsSimulatorMode(!isSimulatorMode); 
                   if(isMobile && !isSimulatorMode) setSidebarOpen(false); 
-                }} style={{ flex: 1, padding: '12px', background: isSimulatorMode ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>
+                }} style={{ flex: 1, padding: '12px', background: isSimulatorMode ? '#f59e0b' : '#10b981', color: currentTheme.isDark ? '#000' : '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>
                   {isSimulatorMode ? `SALIR SIM (${simulatorData.simCredits} CR)` : 'Simulador 🛒'}
                 </button>
                 
                 {isSimulatorMode && (
-                  <button onClick={handleAutoFill} style={{ flex: 1, padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                  <button onClick={handleAutoFill} style={{ flex: 1, padding: '12px', background: currentTheme.primary, color: currentTheme.isDark ? '#000' : '#white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                     ⚡ Auto-Llenar
                   </button>
                 )}
               </div>
               
               <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '5px', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch' }}>
-                <button onClick={() => setInputText(PRELOADED_PENSUMS.IBM_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer' }}>IBM 2020</button>
-                <button onClick={() => setInputText(PRELOADED_PENSUMS.IMC_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer' }}>IMC 2020</button>
-                <button onClick={() => setInputText(PRELOADED_PENSUMS.ELE_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer' }}>ELE 2020</button>
-                <button onClick={() => setInputText(PRELOADED_PENSUMS.IEC_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer' }}>IEC 2020</button>
-                <button onClick={() => setInputText(PRELOADED_PENSUMS.MED_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer' }}>MED 2020</button>
-                <button onClick={() => setInputText(PRELOADED_PENSUMS.ECO_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: isDarkMode ? '#1e293b' : '#fff', color: textPanel, cursor: 'pointer' }}>ECO 2020</button>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.IBM_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: textPanel, cursor: 'pointer' }}>IBM 2020</button>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.IMC_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: textPanel, cursor: 'pointer' }}>IMC 2020</button>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.ELE_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: textPanel, cursor: 'pointer' }}>ELE 2020</button>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.IEC_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: textPanel, cursor: 'pointer' }}>IEC 2020</button>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.MED_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: textPanel, cursor: 'pointer' }}>MED 2020</button>
+                <button onClick={() => setInputText(PRELOADED_PENSUMS.ECO_2020)} style={{ flexShrink: 0, padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', borderRadius: '20px', border: `1px solid ${borderPanel}`, background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: textPanel, cursor: 'pointer' }}>ECO 2020</button>
               </div>
 
-              <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} style={{ flexGrow: 1, padding: '15px', fontFamily: 'monospace', borderRadius: '8px', border: `1px solid ${borderPanel}`, resize: 'none', whiteSpace: 'pre', fontSize: '11px', background: isDarkMode ? '#0f172a' : '#f8fafc', color: textPanel }} />
+              <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} style={{ flexGrow: 1, padding: '15px', fontFamily: 'monospace', borderRadius: '8px', border: `1px solid ${borderPanel}`, resize: 'none', whiteSpace: 'pre', fontSize: '11px', background: currentTheme.isDark ? 'rgba(0,0,0,0.3)' : '#f8fafc', color: textPanel }} />
             </>
           )}
 
           {activeTab === 'gpa' && (
              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-             <div style={{ background: isDarkMode ? '#1e293b' : '#0f172a', color: 'white', padding: '15px', borderRadius: '12px', textAlign: 'center', marginBottom: '15px' }}>
-               <h3 style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>ÍNDICE GENERAL ACUMULADO</h3>
+             <div style={{ background: currentTheme.isDark ? 'rgba(0,0,0,0.3)' : '#0f172a', color: currentTheme.isDark ? currentTheme.text : 'white', padding: '15px', borderRadius: '12px', textAlign: 'center', marginBottom: '15px', border: `1px solid ${borderPanel}` }}>
+               <h3 style={{ margin: 0, fontSize: '12px', color: currentTheme.isDark ? '#94a3b8' : '#94a3b8' }}>ÍNDICE GENERAL ACUMULADO</h3>
                <div style={{ fontSize: '36px', fontWeight: '900', color: gpaStats.globalGpa >= 3.0 ? '#4ade80' : '#facc15' }}>{gpaStats.globalGpa}</div>
              </div>
-             <button onClick={() => saveGpaTerms([{ id: Date.now(), name: `Trimestre ${gpaTerms.length + 1}`, overcredit: false, isManual: false, manualGpa: '', manualCredits: '', subjects: [] }, ...gpaTerms])} style={{ width: '100%', padding: '10px', background: isDarkMode ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}>+ Agregar Trimestre</button>
+             <button onClick={() => saveGpaTerms([{ id: Date.now(), name: `Trimestre ${gpaTerms.length + 1}`, overcredit: false, isManual: false, manualGpa: '', manualCredits: '', subjects: [] }, ...gpaTerms])} style={{ width: '100%', padding: '10px', background: currentTheme.isDark ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}>+ Agregar Trimestre</button>
              
              <div style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>
                {gpaStats.terms.map(term => {
                   const maxCredits = term.maxCredits ?? (term.overcredit ? 26 : 21);
                   const isOverLimit = term.totalCreditsAttempted > maxCredits;
                   return (
-                  <div key={term.id} onClick={() => setActiveGpaTermId(term.id)} style={{ background: activeGpaTermId === term.id ? (isDarkMode ? '#1e3a8a' : '#f0f9ff') : (isDarkMode ? '#1e293b' : '#f8fafc'), border: `2px solid ${activeGpaTermId === term.id ? '#3b82f6' : borderPanel}`, borderRadius: '12px', padding: '12px', cursor: 'pointer' }}>
+                  <div key={term.id} onClick={() => setActiveGpaTermId(term.id)} style={{ background: activeGpaTermId === term.id ? (currentTheme.isDark ? 'rgba(59, 130, 246, 0.2)' : '#f0f9ff') : (currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#f8fafc'), border: `2px solid ${activeGpaTermId === term.id ? currentTheme.primary : borderPanel}`, borderRadius: '12px', padding: '12px', cursor: 'pointer', transition: 'all 0.2s' }}>
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                        <h4 style={{ margin: 0, color: textPanel, fontSize: '14px' }}>{term.name}</h4>
-                       <div style={{ background: isDarkMode ? '#0f172a' : '#0f172a', color: 'white', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold', fontSize: '11px' }}>GPA: {term.gpa}</div>
+                       <div style={{ background: currentTheme.isDark ? 'rgba(0,0,0,0.5)' : '#0f172a', color: currentTheme.isDark ? currentTheme.text : 'white', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold', fontSize: '11px' }}>GPA: {term.gpa}</div>
                      </div>
                      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#64748b' }}>
                        <input type="checkbox" checked={term.isManual} onChange={(e) => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, isManual: e.target.checked } : t))} /> Ingreso Manual
@@ -799,10 +837,10 @@ function FlowApp() {
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: '5px', marginBottom: '10px', alignItems: 'center' }}>
-                            <button onClick={(e) => { e.stopPropagation(); loadOfficialTrimester(term.id); }} style={{ flex: 1, fontSize: '11px', padding: '6px', background: isDarkMode ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cargar Pensum</button>
+                            <button onClick={(e) => { e.stopPropagation(); loadOfficialTrimester(term.id); }} style={{ flex: 1, fontSize: '11px', padding: '6px', background: currentTheme.isDark ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cargar Pensum</button>
                             <span style={{ fontSize: '11px', color: '#64748b' }}>o Toca materias 👉</span>
                             {isMobile && (
-                               <button onClick={(e) => { e.stopPropagation(); setSidebarOpen(false); }} style={{ fontSize: '11px', padding: '6px 10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Ver Mapa</button>
+                               <button onClick={(e) => { e.stopPropagation(); setSidebarOpen(false); }} style={{ fontSize: '11px', padding: '6px 10px', background: currentTheme.primary, color: currentTheme.isDark ? '#000' : 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Ver Mapa</button>
                             )}
                           </div>
                           {(term.subjects || []).map(s => {
@@ -831,29 +869,29 @@ function FlowApp() {
 
           {activeTab === 'goal' && (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div style={{ background: isDarkMode ? '#4c1d95' : '#7e22ce', color: 'white', padding: '15px', borderRadius: '12px', textAlign: 'center', marginBottom: '15px' }}>
-                <h3 style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#d8b4fe' }}>PREDICTOR DE ÍNDICE</h3>
+              <div style={{ background: currentTheme.primary, color: currentTheme.isDark ? '#000' : 'white', padding: '15px', borderRadius: '12px', textAlign: 'center', marginBottom: '15px' }}>
+                <h3 style={{ margin: '0 0 10px 0', fontSize: '12px', opacity: 0.9 }}>PREDICTOR DE ÍNDICE</h3>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '13px' }}>Meta:</span>
-                  <input type="number" step="0.01" max="4.00" min="0" value={targetGpa} onChange={(e) => setTargetGpa(e.target.value)} style={{ width: '80px', fontSize: '24px', fontWeight: '900', textAlign: 'center', background: 'transparent', color: 'white', border: 'none', borderBottom: '2px solid #d8b4fe', outline: 'none' }} />
+                  <input type="number" step="0.01" max="4.00" min="0" value={targetGpa} onChange={(e) => setTargetGpa(e.target.value)} style={{ width: '80px', fontSize: '24px', fontWeight: '900', textAlign: 'center', background: 'transparent', color: 'inherit', border: 'none', borderBottom: '2px solid currentColor', outline: 'none' }} />
                 </div>
               </div>
               
-              <div style={{ padding: '12px', background: isDarkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: `1px solid ${borderPanel}`, marginBottom: '15px' }}>
+              <div style={{ padding: '12px', background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#f8fafc', borderRadius: '12px', border: `1px solid ${borderPanel}`, marginBottom: '15px' }}>
                 <h4 style={{ margin: '0 0 8px 0', color: textPanel, fontSize: '13px' }}>Tu Situación Actual</h4>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b', marginBottom: '5px' }}><span>Índice Actual:</span> <b>{gpaStats.globalGpa}</b></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}><span>Créditos Computados:</span> <b>{gpaStats.globalCredits} CR</b></div>
               </div>
 
-              <div style={{ padding: '12px', background: isDarkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: `1px solid ${borderPanel}` }}>
+              <div style={{ padding: '12px', background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#f8fafc', borderRadius: '12px', border: `1px solid ${borderPanel}` }}>
                 <h4 style={{ margin: '0 0 8px 0', color: textPanel, fontSize: '13px' }}>El Veredicto</h4>
                 <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '10px', lineHeight: '1.4' }}>
                   Calculando en base a <b>{futureCredits} CR</b>. (Selecciona materias en el mapa que planeas cursar, o calcularemos con todas las que te faltan).
                 </p>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', color: predictorColor, textAlign: 'center', padding: '12px', background: isDarkMode ? '#0f172a' : '#fff', borderRadius: '8px', border: `1px solid ${predictorColor}50` }}>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', color: predictorColor, textAlign: 'center', padding: '12px', background: currentTheme.isDark ? 'rgba(0,0,0,0.5)' : '#fff', borderRadius: '8px', border: `1px solid ${predictorColor}50` }}>
                   {predictorMsg}
                 </div>
-                {isMobile && <button onClick={() => setSidebarOpen(false)} style={{ width: '100%', marginTop: '10px', padding: '8px', background: isDarkMode ? '#334155' : '#e2e8f0', border: 'none', borderRadius: '6px', color: textPanel, fontWeight: 'bold' }}>Ver Mapa</button>}
+                {isMobile && <button onClick={() => setSidebarOpen(false)} style={{ width: '100%', marginTop: '10px', padding: '8px', background: currentTheme.isDark ? '#334155' : '#e2e8f0', border: 'none', borderRadius: '6px', color: textPanel, fontWeight: 'bold' }}>Ver Mapa</button>}
               </div>
             </div>
           )}
@@ -861,7 +899,7 @@ function FlowApp() {
         </div>
         
         {/* FOOTER DE CRÉDITOS */}
-        <div style={{ margin: '15px', padding: '10px', textAlign: 'center', fontSize: '10px', background: isDarkMode ? '#0f172a' : '#e2e8f0', color: isDarkMode ? '#475569' : '#94a3b8', borderRadius: '8px' }}>
+        <div style={{ margin: '15px', padding: '10px', textAlign: 'center', fontSize: '10px', background: currentTheme.isDark ? 'rgba(0,0,0,0.2)' : '#e2e8f0', color: currentTheme.isDark ? '#475569' : '#94a3b8', borderRadius: '8px' }}>
           Creado por David Morel (IB) <br/>
           <a href="https://www.linkedin.com/in/david-morel-durán-510569303" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Conectar en LinkedIn</a>
         </div>
@@ -871,26 +909,61 @@ function FlowApp() {
       {!isMobile && (
         <div 
           onMouseDown={startResizing}
-          style={{ width: '6px', height: '100%', cursor: 'ew-resize', backgroundColor: isDarkMode ? '#334155' : '#e2e8f0', zIndex: 50, transition: 'background 0.2s' }}
-          onMouseOver={(e) => e.target.style.backgroundColor = '#3b82f6'}
-          onMouseOut={(e) => e.target.style.backgroundColor = isDarkMode ? '#334155' : '#e2e8f0'}
+          style={{ width: '6px', height: '100%', cursor: 'ew-resize', backgroundColor: currentTheme.isDark ? '#1e293b' : '#e2e8f0', zIndex: 50, transition: 'background 0.2s' }}
+          onMouseOver={(e) => e.target.style.backgroundColor = currentTheme.primary}
+          onMouseOut={(e) => e.target.style.backgroundColor = currentTheme.isDark ? '#1e293b' : '#e2e8f0'}
         />
       )}
 
       {/* ÁREA DEL MAPA */}
       <div style={{ flexGrow: 1, position: 'relative', width: '100%', height: '100%' }}>
         
-        {/* TARJETA DE INFORMACIÓN FLOTANTE (VER MÁS) */}
+        {/* TARJETA DE INFORMACIÓN FLOTANTE (VER MÁS) - AHORA CON GRÁFICO CIRCULAR */}
         {highlightedNodeId && baseGraph.subjectDict[highlightedNodeId] && !isSimulatorMode && activeTab === 'map' && (
-          <div style={{ position: 'absolute', top: 15, left: 15, zIndex: 100, background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 8px 15px -3px rgba(0, 0, 0, 0.3)', border: `1px solid ${borderPanel}`, width: isMobile ? '220px' : '260px' }}>
+          <div style={{ position: 'absolute', top: 15, left: 15, zIndex: 100, background: bgPanel, padding: '15px', borderRadius: '12px', boxShadow: `0 8px 30px ${currentTheme.isDark ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.15)'}`, border: `1px solid ${borderPanel}`, width: isMobile ? '240px' : '280px', color: textPanel, transition: 'all 0.3s ease' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <h4 style={{ margin: '0 0 5px 0', color: textPanel, fontSize: '14px' }}>{highlightedNodeId}</h4>
-              <span style={{ background: '#3b82f6', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>{baseGraph.subjectDict[highlightedNodeId].credits} CR</span>
+              <h4 style={{ margin: '0 0 5px 0', fontSize: '15px', fontWeight: '900' }}>{highlightedNodeId}</h4>
+              <span style={{ background: currentTheme.primary, color: currentTheme.isDark ? '#000' : '#fff', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>{baseGraph.subjectDict[highlightedNodeId].credits} CR</span>
             </div>
-            <p style={{ fontSize: '12px', color: isDarkMode ? '#cbd5e1' : '#475569', margin: '0 0 10px 0', fontWeight: 'bold' }}>{baseGraph.subjectDict[highlightedNodeId].name}</p>
-            <div style={{ fontSize: '11px', color: '#64748b' }}>
-              <b>Prerrequisitos:</b> {baseGraph.subjectDict[highlightedNodeId].prereqs.length > 0 ? baseGraph.subjectDict[highlightedNodeId].prereqs.join(', ') : 'Ninguno'}
-            </div>
+            <p style={{ fontSize: '12.5px', margin: '0 0 15px 0', fontWeight: '600', opacity: 0.9 }}>{baseGraph.subjectDict[highlightedNodeId].name}</p>
+            
+            {/* MINI GRÁFICO CIRCULAR DE PRERREQUISITOS */}
+            {(() => {
+              const nodeData = baseGraph.subjectDict[highlightedNodeId];
+              const reqs = nodeData.prereqs || [];
+              const totalReqs = reqs.length;
+              const passedReqs = reqs.filter(pr => passedIds.has(pr)).length;
+              const percent = totalReqs === 0 ? 100 : Math.round((passedReqs / totalReqs) * 100);
+              const color = percent === 100 ? '#10b981' : currentTheme.primary;
+              const dash = 2 * Math.PI * 18; 
+              const offset = dash - (percent / 100) * dash;
+              
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: currentTheme.isDark ? 'rgba(0,0,0,0.3)' : currentTheme.bg, padding: '10px', borderRadius: '8px', border: `1px solid ${borderPanel}` }}>
+                  <div style={{ position: 'relative', width: '40px', height: '40px' }}>
+                    <svg width="40" height="40" style={{ transform: 'rotate(-90deg)' }}>
+                      <circle cx="20" cy="20" r="18" stroke={borderPanel} strokeWidth="4" fill="none" />
+                      <circle cx="20" cy="20" r="18" stroke={color} strokeWidth="4" fill="none" strokeDasharray={dash} strokeDashoffset={offset} style={{ transition: 'stroke-dashoffset 1s ease-out' }} strokeLinecap="round" />
+                    </svg>
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', color: color }}>
+                      {percent}%
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: currentTheme.primary, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Desbloqueo</div>
+                    <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px', lineHeight: '1.3' }}>
+                      {totalReqs === 0 ? "Sin prerrequisitos." : `${passedReqs} de ${totalReqs} prerrequisitos completados.`}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {baseGraph.subjectDict[highlightedNodeId].prereqs.length > 0 && (
+              <div style={{ marginTop: '12px', fontSize: '10px', opacity: 0.7 }}>
+                <b>Requiere:</b> {baseGraph.subjectDict[highlightedNodeId].prereqs.join(', ')}
+              </div>
+            )}
           </div>
         )}
 
@@ -899,25 +972,26 @@ function FlowApp() {
           onNodeClick={onNodeClick} onPaneClick={() => { setHighlightedNodeId(null); setFocusModeId(null); if(!isMobile) setActiveGpaTermId(null); }} 
           nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView minZoom={0.05}
         >
-          <Background color={isDarkMode ? '#1e293b' : '#cbd5e1'} gap={25} size={1} />
+          {/* Ocultamos el grid de puntos durante el modo enfoque para mayor efecto cinematográfico */}
+          <Background color={currentTheme.isDark ? '#1e293b' : '#cbd5e1'} gap={25} size={1} style={{ opacity: focusModeId ? 0 : 1, transition: 'opacity 0.5s ease' }} />
           <Controls style={{ left: isMobile ? 15 : undefined, bottom: isMobile ? 15 : undefined }} />
-          {!isMobile && <MiniMap nodeColor={(n) => n.type === 'trimester' ? '#f1f5f9' : (n.data?.isPassed ? '#fef08a' : '#6366f1')} nodeStrokeWidth={3} zoomable pannable style={{ width: 140, height: 100 }} />}
+          {!isMobile && <MiniMap nodeColor={(n) => n.type === 'trimester' ? (currentTheme.isDark ? '#1e293b' : '#f1f5f9') : (n.data?.isPassed ? '#fef08a' : currentTheme.primary)} nodeStrokeWidth={3} zoomable pannable style={{ width: 140, height: 100, background: currentTheme.panel, border: `1px solid ${borderPanel}` }} maskColor={currentTheme.isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)'} />}
         </ReactFlow>
 
         {/* PANEL DE AYUDA */}
-        <HelpPanel isDarkMode={isDarkMode} isMobile={isMobile} />
+        <HelpPanel currentTheme={currentTheme} isMobile={isMobile} />
 
         {/* LEYENDA (Colapsable en Móvil) */}
         <div style={{ position: 'absolute', bottom: isMobile ? 15 : 15, right: 15, zIndex: 100 }}>
           {isMobile && !legendOpen ? (
             <button 
               onClick={() => setLegendOpen(true)}
-              style={{ background: isDarkMode ? '#1e293b' : 'white', color: textPanel, border: `1px solid ${borderPanel}`, padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+              style={{ background: bgPanel, color: textPanel, border: `1px solid ${borderPanel}`, padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
             >
               📊 Progreso
             </button>
           ) : (
-            <div style={{ background: isDarkMode ? '#1e293b' : 'white', padding: isMobile ? '12px' : '15px', borderRadius: '12px', boxShadow: '0 8px 15px -3px rgba(0, 0, 0, 0.3)', border: `1px solid ${borderPanel}`, minWidth: isMobile ? '160px' : '220px' }}>
+            <div style={{ background: bgPanel, padding: isMobile ? '12px' : '15px', borderRadius: '12px', boxShadow: `0 8px 30px ${currentTheme.isDark ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.15)'}`, border: `1px solid ${borderPanel}`, minWidth: isMobile ? '160px' : '220px', color: textPanel, transition: 'all 0.3s ease' }}>
               
               {isSimulatorMode ? (
                 <div style={{ textAlign: 'center' }}>
@@ -930,7 +1004,7 @@ function FlowApp() {
                   
                   {/* TABLA DEL CARRITO DE SIMULADOR */}
                   {simulatorCart.size > 0 && (
-                    <div style={{ maxHeight: '120px', overflowY: 'auto', borderTop: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`, paddingTop: '8px', marginTop: '8px', textAlign: 'left' }}>
+                    <div style={{ maxHeight: '120px', overflowY: 'auto', borderTop: `1px solid ${borderPanel}`, paddingTop: '8px', marginTop: '8px', textAlign: 'left' }}>
                       <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px', fontWeight: 'bold' }}>MATERIAS SELECCIONADAS:</div>
                       {[...simulatorCart].map(code => {
                         const info = baseGraph.subjectDict[code];
@@ -945,16 +1019,16 @@ function FlowApp() {
                   )}
 
                   {/* MANEJO DE ESCENARIOS */}
-                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px dashed ${isDarkMode ? '#334155' : '#cbd5e1'}` }}>
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px dashed ${borderPanel}` }}>
                     <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '6px', fontWeight: 'bold' }}>MANEJO DE ESCENARIOS:</div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <div style={{ flex: 1, display: 'flex', gap: '4px' }}>
-                        <button onClick={() => saveScenario('A')} style={{ flex: 1, padding: '4px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}>💾 A</button>
-                        <button onClick={() => loadScenario('A')} disabled={!scenarios.A || scenarios.A.length === 0} style={{ flex: 1, padding: '4px', background: (scenarios.A && scenarios.A.length > 0) ? '#10b981' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: (scenarios.A && scenarios.A.length > 0) ? 'pointer' : 'not-allowed' }}>📂 A</button>
+                        <button onClick={() => saveScenario('A')} style={{ flex: 1, padding: '4px', background: currentTheme.primary, color: currentTheme.isDark ? '#000' : 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: 'bold' }}>💾 A</button>
+                        <button onClick={() => loadScenario('A')} disabled={!scenarios.A || scenarios.A.length === 0} style={{ flex: 1, padding: '4px', background: (scenarios.A && scenarios.A.length > 0) ? '#10b981' : (currentTheme.isDark ? '#334155' : '#94a3b8'), color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: (scenarios.A && scenarios.A.length > 0) ? 'pointer' : 'not-allowed' }}>📂 A</button>
                       </div>
                       <div style={{ flex: 1, display: 'flex', gap: '4px' }}>
-                        <button onClick={() => saveScenario('B')} style={{ flex: 1, padding: '4px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}>💾 B</button>
-                        <button onClick={() => loadScenario('B')} disabled={!scenarios.B || scenarios.B.length === 0} style={{ flex: 1, padding: '4px', background: (scenarios.B && scenarios.B.length > 0) ? '#10b981' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: (scenarios.B && scenarios.B.length > 0) ? 'pointer' : 'not-allowed' }}>📂 B</button>
+                        <button onClick={() => saveScenario('B')} style={{ flex: 1, padding: '4px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: 'bold' }}>💾 B</button>
+                        <button onClick={() => loadScenario('B')} disabled={!scenarios.B || scenarios.B.length === 0} style={{ flex: 1, padding: '4px', background: (scenarios.B && scenarios.B.length > 0) ? '#10b981' : (currentTheme.isDark ? '#334155' : '#94a3b8'), color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: (scenarios.B && scenarios.B.length > 0) ? 'pointer' : 'not-allowed' }}>📂 B</button>
                       </div>
                     </div>
                   </div>
@@ -963,40 +1037,40 @@ function FlowApp() {
               ) : (
                 <>
                   <h4 style={{ margin: '0 0 8px 0', fontSize: isMobile ? '12px' : '13px', color: textPanel, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Mi Progreso</span> <span style={{ color: isDarkMode ? '#f8fafc' : '#0f172a' }}>{progress.percent}%</span>
+                    <span>Mi Progreso</span> <span style={{ color: currentTheme.isDark ? currentTheme.text : '#0f172a' }}>{progress.percent}%</span>
                   </h4>
-                  <div style={{ width: '100%', height: '6px', background: isDarkMode ? '#334155' : '#e2e8f0', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}><div style={{ height: '100%', background: '#10b981', width: `${progress.percent}%` }}></div></div>
+                  <div style={{ width: '100%', height: '6px', background: currentTheme.isDark ? 'rgba(0,0,0,0.5)' : '#e2e8f0', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}><div style={{ height: '100%', background: '#10b981', width: `${progress.percent}%` }}></div></div>
                   <div style={{ fontSize: isMobile ? '10px' : '11px', color: '#64748b', textAlign: 'right', marginBottom: '10px', fontWeight: 'bold' }}>Total: {progress.pCredits} / {progress.tCredits} CR</div>
                   <hr style={{ border: 'none', borderTop: `1px solid ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569' }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '8px', height: '8px', background: isDarkMode ? '#818cf8' : '#4f46e5', borderRadius: '50%', marginRight: '6px' }}></div> <span>F. General</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: isMobile ? '10px' : '11px', color: currentTheme.isDark ? '#cbd5e1' : '#475569' }}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '8px', height: '8px', background: currentTheme.e1, borderRadius: '50%', marginRight: '6px' }}></div> <span>F. General</span></div>
                     <b>{progress.c100.p}/{progress.c100.t}</b>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569' }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '8px', height: '8px', background: isDarkMode ? '#34d399' : '#059669', borderRadius: '50%', marginRight: '6px' }}></div> <span>Especializada</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: isMobile ? '10px' : '11px', color: currentTheme.isDark ? '#cbd5e1' : '#475569' }}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '8px', height: '8px', background: currentTheme.e2, borderRadius: '50%', marginRight: '6px' }}></div> <span>Especializada</span></div>
                     <b>{progress.c200.p}/{progress.c200.t}</b>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '6px' : '10px', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569' }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '8px', height: '8px', background: isDarkMode ? '#fb7185' : '#e11d48', borderRadius: '50%', marginRight: '6px' }}></div> <span>Profesional</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '6px' : '10px', fontSize: isMobile ? '10px' : '11px', color: currentTheme.isDark ? '#cbd5e1' : '#475569' }}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '8px', height: '8px', background: currentTheme.e3, borderRadius: '50%', marginRight: '6px' }}></div> <span>Profesional</span></div>
                     <b>{progress.c300.p}/{progress.c300.t}</b>
                   </div>
                   
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   
-                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold', marginBottom: '6px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: currentTheme.isDark ? '#cbd5e1' : '#475569', fontWeight: 'bold', marginBottom: '6px' }}>
                     Bloqueo Estricto 🔒
                     <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
                   </label>
 
-                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: currentTheme.isDark ? '#cbd5e1' : '#475569', fontWeight: 'bold' }}>
                     Ocultar flechas pasadas 👁️
                     <input type="checkbox" checked={hidePassedEdges} onChange={(e) => { setHidePassedEdges(e.target.checked); localStorage.setItem('pensum_hide_passed_edges', e.target.checked); }} />
                   </label>
                 </>
               )}
               {isMobile && (
-                <button onClick={() => setLegendOpen(false)} style={{ width: '100%', marginTop: '8px', padding: '6px', background: isDarkMode ? '#334155' : '#f1f5f9', border: 'none', borderRadius: '6px', color: textPanel, fontSize: '11px', fontWeight: 'bold' }}>Ocultar</button>
+                <button onClick={() => setLegendOpen(false)} style={{ width: '100%', marginTop: '8px', padding: '6px', background: currentTheme.isDark ? 'rgba(0,0,0,0.3)' : '#f1f5f9', border: 'none', borderRadius: '6px', color: textPanel, fontSize: '11px', fontWeight: 'bold' }}>Ocultar</button>
               )}
             </div>
           )}
