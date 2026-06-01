@@ -110,7 +110,8 @@ function FlowApp() {
   const [focusModeId, setFocusModeId] = useState(null);
   
   const [isSimulatorMode, setIsSimulatorMode] = useState(false);
-  const isSimulatorModeRef = useRef(false); // NUEVO REF: Para interceptar la casilla en el simulador
+  const [simulatorLimit, setSimulatorLimit] = useState(21); // NUEVO ESTADO: Límite personalizable
+  const isSimulatorModeRef = useRef(false); 
   const [simulatorCart, setSimulatorCart] = useState(new Set());
   const [gpaTerms, setGpaTerms] = useState([]); 
   const [activeGpaTermId, setActiveGpaTermId] = useState(null); 
@@ -129,6 +130,7 @@ function FlowApp() {
       const sPassed = localStorage.getItem('pensum_passed');
       const sStrict = localStorage.getItem('pensum_strict');
       const sHidePassedEdges = localStorage.getItem('pensum_hide_passed_edges');
+      const sSimLimit = localStorage.getItem('pensum_sim_limit'); // Persistencia de límite
       const sGpaTerms = localStorage.getItem('pensum_gpa');
       const sDark = localStorage.getItem('pensum_dark');
       const sCompact = localStorage.getItem('pensum_compact');
@@ -139,6 +141,7 @@ function FlowApp() {
       if (sPassed) setPassedIds(new Set(JSON.parse(sPassed)));
       if (sStrict !== null) setIsStrictMode(JSON.parse(sStrict));
       if (sHidePassedEdges !== null) setHidePassedEdges(JSON.parse(sHidePassedEdges));
+      if (sSimLimit !== null) setSimulatorLimit(parseInt(sSimLimit));
       if (sDark !== null) setIsDarkMode(JSON.parse(sDark));
       if (sCompact !== null) setIsCompact(JSON.parse(sCompact));
       if (sGpaTerms) {
@@ -151,7 +154,6 @@ function FlowApp() {
     }
   }, []);
 
-  // Mantener actualizado el ref del simulador
   useEffect(() => {
     isSimulatorModeRef.current = isSimulatorMode;
   }, [isSimulatorMode]);
@@ -189,7 +191,6 @@ function FlowApp() {
   }, [resize, stopResizing]);
 
   const handleToggleSubject = useCallback((id, checked) => {
-    // NUEVA LÓGICA: Bloquear el uso de la casilla durante el Modo Simulador
     if (isSimulatorModeRef.current) {
       alert("💡 MODO SIMULADOR\n\nPara agregar materias a tu simulación, haz clic en el RECTÁNGULO de la materia, no en esta casilla.\n\nLa casilla sirve únicamente para marcar las materias que ya aprobaste en la vida real.");
       return; 
@@ -565,7 +566,7 @@ function FlowApp() {
               <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                 <button onClick={() => { parseTextToGraph(inputText); if(isMobile) setSidebarOpen(false); }} style={{ flex: 1, padding: '12px', background: isDarkMode ? '#3b82f6' : '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>Renderizar Pensum</button>
                 <button onClick={() => { 
-                  if (isSimulatorMode) setSimulatorCart(new Set()); // NUEVA LÓGICA: Vacia el carrito al salir
+                  if (isSimulatorMode) setSimulatorCart(new Set()); 
                   setIsSimulatorMode(!isSimulatorMode); 
                   if(isMobile && !isSimulatorMode) setSidebarOpen(false); 
                 }} style={{ flex: 1, padding: '12px', background: isSimulatorMode ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>
@@ -629,7 +630,10 @@ function FlowApp() {
                             const info = baseGraph.subjectDict[s.code];
                             return (
                               <div key={s.code} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${borderPanel}` }}>
-                                <div style={{ fontSize: '12px', color: textPanel, fontWeight: 'bold' }}>{s.code} <span style={{color:'#64748b', fontWeight:'normal'}}>- {info?.credits}CR</span></div>
+                                <div style={{ fontSize: '12px', color: textPanel, fontWeight: 'bold', display: 'flex', flexDirection: 'column' }}>
+                                  <span>{s.code} <span style={{color:'#64748b', fontWeight:'normal'}}>- {info?.credits}CR</span></span>
+                                  <span style={{color: '#64748b', fontSize: '10px', fontWeight: 'normal'}}>{info?.name || 'Materia Custom'}</span>
+                                </div>
                                 <select value={s.grade} onChange={(e) => saveGpaTerms(gpaTerms.map(t => t.id === term.id ? { ...t, subjects: (t.subjects || []).map(sub => sub.code === s.code ? { ...sub, grade: e.target.value } : sub) } : t))} style={{ padding: '4px', borderRadius: '4px', border: `1px solid ${borderPanel}`, background: bgPanel, color: textPanel }}>
                                   <option value="" disabled>Nota</option>
                                   {Object.keys(gradingScale).map(l => <option key={l} value={l}>{l}</option>)}
@@ -696,6 +700,21 @@ function FlowApp() {
 
       {/* ÁREA DEL MAPA */}
       <div style={{ flexGrow: 1, position: 'relative', width: '100%', height: '100%' }}>
+        
+        {/* TARJETA DE INFORMACIÓN FLOTANTE (VER MÁS) */}
+        {highlightedNodeId && baseGraph.subjectDict[highlightedNodeId] && !isSimulatorMode && activeTab === 'map' && (
+          <div style={{ position: 'absolute', top: 15, left: 15, zIndex: 100, background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 8px 15px -3px rgba(0, 0, 0, 0.3)', border: `1px solid ${borderPanel}`, width: isMobile ? '220px' : '260px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <h4 style={{ margin: '0 0 5px 0', color: textPanel, fontSize: '14px' }}>{highlightedNodeId}</h4>
+              <span style={{ background: '#3b82f6', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>{baseGraph.subjectDict[highlightedNodeId].credits} CR</span>
+            </div>
+            <p style={{ fontSize: '12px', color: isDarkMode ? '#cbd5e1' : '#475569', margin: '0 0 10px 0', fontWeight: 'bold' }}>{baseGraph.subjectDict[highlightedNodeId].name}</p>
+            <div style={{ fontSize: '11px', color: '#64748b' }}>
+              <b>Prerrequisitos:</b> {baseGraph.subjectDict[highlightedNodeId].prereqs.length > 0 ? baseGraph.subjectDict[highlightedNodeId].prereqs.join(', ') : 'Ninguno'}
+            </div>
+          </div>
+        )}
+
         <ReactFlow 
           nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick} onPaneClick={() => { setHighlightedNodeId(null); setFocusModeId(null); if(!isMobile) setActiveGpaTermId(null); }} 
@@ -719,13 +738,32 @@ function FlowApp() {
               📊 Progreso
             </button>
           ) : (
-            <div style={{ background: isDarkMode ? '#1e293b' : 'white', padding: isMobile ? '12px' : '15px', borderRadius: '12px', boxShadow: '0 8px 15px -3px rgba(0, 0, 0, 0.3)', border: `1px solid ${borderPanel}`, minWidth: isMobile ? '160px' : '200px' }}>
+            <div style={{ background: isDarkMode ? '#1e293b' : 'white', padding: isMobile ? '12px' : '15px', borderRadius: '12px', boxShadow: '0 8px 15px -3px rgba(0, 0, 0, 0.3)', border: `1px solid ${borderPanel}`, minWidth: isMobile ? '160px' : '220px' }}>
               
               {isSimulatorMode ? (
                 <div style={{ textAlign: 'center' }}>
                   <h4 style={{ margin: '0 0 5px 0', color: '#f59e0b', fontSize: isMobile ? '11px' : '13px' }}>SIMULADOR ACTIVO</h4>
-                  <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '900', color: simulatorData.simCredits > 26 ? '#ef4444' : textPanel }}>{simulatorData.simCredits} / 21 CR</div>
+                  <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '900', color: simulatorData.simCredits > simulatorLimit ? '#ef4444' : textPanel, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                    {simulatorData.simCredits} / 
+                    <input type="number" value={simulatorLimit} onChange={(e) => { setSimulatorLimit(e.target.value); localStorage.setItem('pensum_sim_limit', e.target.value); }} style={{ width: '35px', fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', background: 'transparent', border: 'none', borderBottom: `2px dashed ${simulatorData.simCredits > simulatorLimit ? '#ef4444' : '#64748b'}`, outline: 'none', textAlign: 'center', padding: 0 }} /> CR
+                  </div>
                   {!isMobile && <p style={{ fontSize: '11px', color: '#64748b', margin: '5px 0 0 0' }}>Haz clic en las materias naranjas para armar tu trimestre.</p>}
+                  
+                  {/* TABLA DEL CARRITO DE SIMULADOR */}
+                  {simulatorCart.size > 0 && (
+                    <div style={{ maxHeight: '120px', overflowY: 'auto', borderTop: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`, paddingTop: '8px', marginTop: '8px', textAlign: 'left' }}>
+                      <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px', fontWeight: 'bold' }}>MATERIAS SELECCIONADAS:</div>
+                      {[...simulatorCart].map(code => {
+                        const info = baseGraph.subjectDict[code];
+                        return (
+                          <div key={code} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px', color: textPanel }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: isMobile ? '120px' : '150px' }} title={info?.name}>{code} - {info?.name}</span>
+                            <b>{info?.credits} CR</b>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -752,7 +790,7 @@ function FlowApp() {
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold', marginBottom: '6px' }}>
-                    Bloqueo Estricto 🔒
+                    Bloqueo de materias con pre-req incumplidos🔒
                     <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
                   </label>
 
