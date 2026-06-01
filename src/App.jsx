@@ -16,8 +16,9 @@ const gradingScale = { 'A+': 4.00, 'A': 3.75, 'B+': 3.50, 'B': 3.00, 'C+': 2.50,
 const THEMES = {
   light: { id: 'light', icon: '☀️', bg: '#f1f5f9', panel: '#ffffff', text: '#1e293b', border: '#e2e8f0', primary: '#3b82f6', isDark: false, e1: '#4f46e5', e2: '#059669', e3: '#e11d48' },
   dark: { id: 'dark', icon: '🌙', bg: '#020617', panel: '#0f172a', text: '#f8fafc', border: '#334155', primary: '#3b82f6', isDark: true, e1: '#818cf8', e2: '#34d399', e3: '#fb7185' },
+  minimal: { id: 'minimal', icon: '☕', bg: '#f9fafb', panel: '#ffffff', text: '#111827', border: '#d1d5db', primary: '#4b5563', isDark: false, e1: '#6b7280', e2: '#9ca3af', e3: '#4b5563' },
   matrix: { id: 'matrix', icon: '💻', bg: '#000000', panel: '#0a0a0a', text: '#22c55e', border: '#166534', primary: '#22c55e', isDark: true, e1: '#22c55e', e2: '#16a34a', e3: '#4ade80' },
-  cyberpunk: { id: 'cyberpunk', icon: '🌃', bg: '#2b0947', panel: '#1a052e', text: '#fdf4ff', border: '#d946ef', primary: '#00ffff', isDark: true, e1: '#00ffff', e2: '#d946ef', e3: '#f43f5e' }
+  cyberpunk: { id: 'cyberpunk', icon: '🌃', bg: '#17122b', panel: '#100c1e', text: '#e0dcf0', border: '#4a3f75', primary: '#00d0ff', isDark: true, e1: '#00d0ff', e2: '#a476d9', e3: '#f06292' }
 };
 const THEME_KEYS = Object.keys(THEMES);
 
@@ -83,17 +84,46 @@ function HelpPanel({ currentTheme, isMobile }) {
         <div style={{ marginTop: '10px', width: isMobile ? '260px' : '320px', background: currentTheme.panel, padding: '15px', borderRadius: '12px', border: `2px solid ${bg}`, boxShadow: '0 10px 15px rgba(0,0,0,0.3)', color: currentTheme.text }}>
           <h4 style={{ margin: '0 0 10px 0', borderBottom: `1px solid ${currentTheme.border}`, paddingBottom: '5px', fontSize: isMobile ? '13px' : '15px' }}>Funciones Principales:</h4>
           <ul style={{ fontSize: isMobile ? '11.5px' : '12.5px', paddingLeft: '20px', lineHeight: '1.6', margin: 0 }}>
-            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Doble clic en una materia para aislar su ruta de prerrequisitos de forma cinematográfica.</li>
+            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Clic simple para detalles. Doble clic en una materia para aislar su ruta visualmente.</li>
+            <li style={{ marginBottom: '6px' }}><b>Calculadora GPA:</b> Calcula tu índice general y por trimestre cargando tus notas en la pestaña GPA.</li>
             <li style={{ marginBottom: '6px' }}><b>Simulador 🛒:</b> Selecciona materias para armar tu trimestre ideal sin pasarte del límite.</li>
-            <li style={{ marginBottom: '6px' }}><b>Auto-Llenar ⚡:</b> Arma el trimestre priorizando las materias más críticas según el Mapa de Calor.</li>
-            <li style={{ marginBottom: '6px' }}><b>Planes A/B:</b> Guarda y compara diferentes combinaciones en el simulador.</li>
-            <li><b>Temas Personalizados:</b> Haz clic en el sol/luna (☀️) para cambiar los colores de la aplicación.</li>
+            <li style={{ marginBottom: '6px' }}><b>Auto-Llenar ⚡:</b> Arma el trimestre priorizando materias críticas (Mapa de Calor).</li>
+            <li style={{ marginBottom: '6px' }}><b>Planes A/B:</b> Guarda y compara diferentes combinaciones de simulador.</li>
+            <li><b>Temas:</b> Haz clic en el sol/luna para cambiar la apariencia a Minimalista, Cyberpunk, etc.</li>
           </ul>
         </div>
       )}
     </div>
   );
 }
+
+// ==========================================
+// COMPONENTE GRÁFICO CIRCULAR
+// ==========================================
+const RingProgress = ({ current, total, color, label, theme }) => {
+  const size = 50;
+  const percent = total === 0 ? 0 : Math.round((current / total) * 100);
+  const r = size / 2 - 4;
+  const dash = 2 * Math.PI * r;
+  const offset = dash - (percent / 100) * dash;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+      <div style={{ position: 'relative', width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size/2} cy={size/2} r={r} stroke={theme.border} strokeWidth="4" fill="none" />
+          <circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth="4" fill="none" strokeDasharray={dash} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s ease-out' }}/>
+        </svg>
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', color: theme.text }}>
+          {percent}%
+        </div>
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '9px', color: theme.text, opacity: 0.8 }}>{label}</div>
+        <div style={{ fontSize: '10px', fontWeight: 'bold', color: theme.text }}>{current}/{total}</div>
+      </div>
+    </div>
+  );
+};
 
 // ==========================================
 // MOTOR PRINCIPAL (100% RESPONSIVE)
@@ -107,12 +137,9 @@ function FlowApp() {
   const [hidePassedEdges, setHidePassedEdges] = useState(false);
   const [isHeatmapMode, setIsHeatmapMode] = useState(false);
   
-  // Nuevo Estado: Tema Activo
   const [activeTheme, setActiveTheme] = useState('light');
-  
   const [isCompact, setIsCompact] = useState(false); 
   
-  // --- RESPONSIVE STATE ---
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [sidebarWidth, setSidebarWidth] = useState(window.innerWidth < 768 ? window.innerWidth : 460);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
@@ -149,7 +176,7 @@ function FlowApp() {
       const sHidePassedEdges = localStorage.getItem('pensum_hide_passed_edges');
       const sSimLimit = localStorage.getItem('pensum_sim_limit'); 
       const sTheme = localStorage.getItem('pensum_theme');
-      const sDark = localStorage.getItem('pensum_dark'); // Legacy fallback
+      const sDark = localStorage.getItem('pensum_dark'); 
       const sCompact = localStorage.getItem('pensum_compact');
       const sScenarios = localStorage.getItem('pensum_scenarios');
       const sGpaTerms = localStorage.getItem('pensum_gpa');
@@ -162,7 +189,6 @@ function FlowApp() {
       if (sHidePassedEdges !== null) setHidePassedEdges(JSON.parse(sHidePassedEdges));
       if (sSimLimit !== null) setSimulatorLimit(parseInt(sSimLimit));
       
-      // Theme Persistencia
       if (sTheme && THEMES[sTheme]) setActiveTheme(sTheme);
       else if (sDark !== null) setActiveTheme(JSON.parse(sDark) ? 'dark' : 'light');
 
@@ -204,7 +230,6 @@ function FlowApp() {
 
   const saveGpaTerms = (newTerms) => { setGpaTerms(newTerms); localStorage.setItem('pensum_gpa', JSON.stringify(newTerms)); };
   
-  // FUNCION DE TEMA ROTATIVO
   const toggleTheme = () => {
     setActiveTheme(prev => {
       const nextIdx = (THEME_KEYS.indexOf(prev) + 1) % THEME_KEYS.length;
@@ -356,7 +381,6 @@ function FlowApp() {
     setSimulatorCart(new Set(validSubjects));
     alert(`📂 Plan ${planName} cargado en el simulador.`);
   };
-
 
   const handleAutoFill = () => {
     if (!isSimulatorMode) return;
@@ -573,19 +597,18 @@ function FlowApp() {
             };
           }
 
-          // LÓGICA MODO ENFOQUE CINEMATOGRÁFICO
           let cinematicStyle = {};
           if (focusModeId) {
             if (isDimmed) {
-              cinematicStyle = { filter: 'blur(5px) grayscale(80%)', opacity: 0.3, pointerEvents: 'none', transition: 'all 0.4s ease' };
+              cinematicStyle = { filter: 'blur(4px) grayscale(80%)', opacity: 0.3, pointerEvents: 'none', transition: 'all 0.4s ease' };
             } else {
-              cinematicStyle = { boxShadow: `0 0 25px 5px ${currentTheme.primary}AA`, zIndex: 1000, transition: 'all 0.4s ease', transform: 'scale(1.02)' };
+              cinematicStyle = { boxShadow: `0 0 25px 5px ${currentTheme.primary}AA`, zIndex: 1000, transition: 'all 0.4s ease' };
             }
           }
 
           return { 
             ...n, 
-            hidden: false, // Ya no ocultamos, usamos blur y opacity
+            hidden: false, 
             position: { x: 25, y: newY },
             style: { ...n.style, ...heatmapStyle, ...cinematicStyle },
             data: { 
@@ -628,9 +651,9 @@ function FlowApp() {
         if (isActiveHighlight) {
           opacity = 1;
           strokeWidth = 4;
-          filter = `drop-shadow(0px 0px 4px ${color})`; // NEON GLOW PARA FLECHAS
+          filter = `drop-shadow(0px 0px 4px ${color})`;
         } else {
-          opacity = 0; // Desaparecer flechas no enfocadas
+          opacity = 0;
         }
       } else if (highlightedNodeId) {
         opacity = isActiveHighlight ? 1 : 0.05;
@@ -742,7 +765,6 @@ function FlowApp() {
               <button onClick={() => setIsHeatmapMode(!isHeatmapMode)} title="Mapa de Calor (Cuellos de Botella)" style={{ fontSize: '16px', background: isHeatmapMode ? '#ef4444' : 'transparent', color: isHeatmapMode ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px', transition: 'background 0.3s' }}>🔥</button>
             )}
             <button onClick={toggleCompactMode} title="Modo Compacto" style={{ fontSize: '16px', background: isCompact ? currentTheme.primary : 'transparent', color: isCompact ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>🗜️</button>
-            {/* BOTÓN MOTOR DE TEMAS */}
             <button onClick={toggleTheme} title="Cambiar Tema" style={{ fontSize: '16px', background: 'transparent', border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>{currentTheme.icon}</button>
           </div>
         </div>
@@ -804,10 +826,47 @@ function FlowApp() {
 
           {activeTab === 'gpa' && (
              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-             <div style={{ background: currentTheme.isDark ? 'rgba(0,0,0,0.3)' : '#0f172a', color: currentTheme.isDark ? currentTheme.text : 'white', padding: '15px', borderRadius: '12px', textAlign: 'center', marginBottom: '15px', border: `1px solid ${borderPanel}` }}>
-               <h3 style={{ margin: 0, fontSize: '12px', color: currentTheme.isDark ? '#94a3b8' : '#94a3b8' }}>ÍNDICE GENERAL ACUMULADO</h3>
-               <div style={{ fontSize: '36px', fontWeight: '900', color: gpaStats.globalGpa >= 3.0 ? '#4ade80' : '#facc15' }}>{gpaStats.globalGpa}</div>
-             </div>
+             
+             {/* DASHBOARD DE TENDENCIA GPA */}
+             {(() => {
+                const chartTerms = [...gpaStats.terms].reverse().filter(t => t.totalCreditsAttempted > 0);
+                if (chartTerms.length === 0) return null;
+                const padX = 20, padY = 15, w = 300, h = 100, maxGPA = 4.0;
+                const points = chartTerms.map((t, i) => {
+                    const x = padX + (chartTerms.length === 1 ? (w-padX*2)/2 : i * ((w - padX * 2) / (chartTerms.length - 1)));
+                    const y = h - padY - (parseFloat(t.gpa) / maxGPA) * (h - padY * 2);
+                    return { x, y, gpa: t.gpa, name: t.name };
+                });
+                return (
+                  <div style={{ background: currentTheme.isDark ? 'rgba(0,0,0,0.3)' : '#ffffff', padding: '15px', borderRadius: '12px', border: `1px solid ${borderPanel}`, marginBottom: '15px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '10px' }}>
+                      <h4 style={{ margin: 0, fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>TENDENCIA DE ÍNDICE</h4>
+                      <div style={{ fontSize: '24px', fontWeight: '900', color: gpaStats.globalGpa >= 3.0 ? '#4ade80' : '#facc15', lineHeight: '1' }}>{gpaStats.globalGpa}</div>
+                    </div>
+                    <svg width="100%" height="100" viewBox="0 0 300 100" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                      <defs>
+                        <linearGradient id="gpaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={currentTheme.primary} stopOpacity="0.4" />
+                          <stop offset="100%" stopColor={currentTheme.primary} stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      {/* Grid Lines */}
+                      <line x1={padX} y1={padY} x2={w-padX} y2={padY} stroke={borderPanel} strokeDasharray="4,4" />
+                      <line x1={padX} y1={h-padY} x2={w-padX} y2={h-padY} stroke={borderPanel} strokeDasharray="4,4" />
+                      
+                      <polygon points={`${points[0].x},${h-padY} ${points.map(p => `${p.x},${p.y}`).join(' ')} ${points[points.length-1].x},${h-padY}`} fill="url(#gpaGrad)" />
+                      <polyline points={points.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={currentTheme.primary} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      {points.map((p, i) => (
+                        <g key={i}>
+                          <circle cx={p.x} cy={p.y} r="4" fill={currentTheme.panel} stroke={currentTheme.primary} strokeWidth="2" />
+                          <text x={p.x} y={p.y - 10} fontSize="9" fill={textPanel} textAnchor="middle" fontWeight="bold">{p.gpa}</text>
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                );
+             })()}
+
              <button onClick={() => saveGpaTerms([{ id: Date.now(), name: `Trimestre ${gpaTerms.length + 1}`, overcredit: false, isManual: false, manualGpa: '', manualCredits: '', subjects: [] }, ...gpaTerms])} style={{ width: '100%', padding: '10px', background: currentTheme.isDark ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}>+ Agregar Trimestre</button>
              
              <div style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -1041,19 +1100,12 @@ function FlowApp() {
                   </h4>
                   <div style={{ width: '100%', height: '6px', background: currentTheme.isDark ? 'rgba(0,0,0,0.5)' : '#e2e8f0', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}><div style={{ height: '100%', background: '#10b981', width: `${progress.percent}%` }}></div></div>
                   <div style={{ fontSize: isMobile ? '10px' : '11px', color: '#64748b', textAlign: 'right', marginBottom: '10px', fontWeight: 'bold' }}>Total: {progress.pCredits} / {progress.tCredits} CR</div>
-                  <hr style={{ border: 'none', borderTop: `1px solid ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: isMobile ? '10px' : '11px', color: currentTheme.isDark ? '#cbd5e1' : '#475569' }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '8px', height: '8px', background: currentTheme.e1, borderRadius: '50%', marginRight: '6px' }}></div> <span>F. General</span></div>
-                    <b>{progress.c100.p}/{progress.c100.t}</b>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: isMobile ? '10px' : '11px', color: currentTheme.isDark ? '#cbd5e1' : '#475569' }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '8px', height: '8px', background: currentTheme.e2, borderRadius: '50%', marginRight: '6px' }}></div> <span>Especializada</span></div>
-                    <b>{progress.c200.p}/{progress.c200.t}</b>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '6px' : '10px', fontSize: isMobile ? '10px' : '11px', color: currentTheme.isDark ? '#cbd5e1' : '#475569' }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}><div style={{ width: '8px', height: '8px', background: currentTheme.e3, borderRadius: '50%', marginRight: '6px' }}></div> <span>Profesional</span></div>
-                    <b>{progress.c300.p}/{progress.c300.t}</b>
+                  {/* DASHBOARD DE ANILLOS RADIALES */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', marginBottom: '10px' }}>
+                    <RingProgress current={progress.c100.p} total={progress.c100.t} color={currentTheme.e1} label="General" theme={currentTheme} />
+                    <RingProgress current={progress.c200.p} total={progress.c200.t} color={currentTheme.e2} label="Específ." theme={currentTheme} />
+                    <RingProgress current={progress.c300.p} total={progress.c300.t} color={currentTheme.e3} label="Profes." theme={currentTheme} />
                   </div>
                   
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
