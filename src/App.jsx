@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react';
 import React, { useState, useCallback, useRef, useEffect, useMemo, Component } from 'react';
 import ReactFlow, { Background, Controls, MarkerType, MiniMap, applyNodeChanges, applyEdgeChanges, useReactFlow, ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -770,6 +771,8 @@ export default function App() {
     <ReactFlowProvider>
       <ErrorBoundary>
         <FlowApp />
+        {/* Vercel Analytics Component */}
+        <Analytics /> 
       </ErrorBoundary>
     </ReactFlowProvider>
   ); 
