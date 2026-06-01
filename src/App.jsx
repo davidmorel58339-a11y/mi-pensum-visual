@@ -72,10 +72,10 @@ function HelpPanel({ isDarkMode, isMobile }) {
         <div style={{ marginTop: '10px', width: isMobile ? '260px' : '320px', background: isDarkMode ? '#1e293b' : 'white', padding: '15px', borderRadius: '12px', border: `2px solid ${bg}`, boxShadow: '0 10px 15px rgba(0,0,0,0.3)', color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
           <h4 style={{ margin: '0 0 10px 0', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`, paddingBottom: '5px', fontSize: isMobile ? '13px' : '15px' }}>Funciones Principales:</h4>
           <ul style={{ fontSize: isMobile ? '11.5px' : '12.5px', paddingLeft: '20px', lineHeight: '1.6', margin: 0 }}>
-            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Haz <i>doble clic</i> en cualquier materia para aislar su cadena de prerrequisitos en el mapa.</li>
-            <li style={{ marginBottom: '6px' }}><b>Calculadora GPA:</b> Selecciona un trimestre en la barra izquierda, luego toca materias en el mapa para agregarlas.</li>
-            <li style={{ marginBottom: '6px' }}><b>Predictor (Meta GPA):</b> El cálculo se basará automáticamente en tu <b>Índice Actual</b> generado en la pestaña de GPA.</li>
+            <li style={{ marginBottom: '6px' }}><b>Modo Enfoque:</b> Haz <i>doble clic</i> en cualquier materia para aislar su cadena de prerrequisitos.</li>
             <li style={{ marginBottom: '6px' }}><b>Simulador 🛒:</b> Descubre qué materias tienes "desbloqueadas" y arma tu próximo trimestre sin pasarte del límite.</li>
+            <li style={{ marginBottom: '6px' }}><b>Auto-Llenar ⚡:</b> El algoritmo armará tu trimestre ideal basándose en las materias que abren más caminos.</li>
+            <li style={{ marginBottom: '6px' }}><b>Mapa de Calor 🔥:</b> Un escáner que te dice matemáticamente cuáles materias son "Cuellos de Botella".</li>
             <li><b>Correquisitos:</b> Las líneas punteadas en el mapa indican laboratorios o materias que deben darse juntas.</li>
           </ul>
         </div>
@@ -94,6 +94,7 @@ function FlowApp() {
   const [passedIds, setPassedIds] = useState(new Set());
   const [isStrictMode, setIsStrictMode] = useState(true);
   const [hidePassedEdges, setHidePassedEdges] = useState(false);
+  const [isHeatmapMode, setIsHeatmapMode] = useState(false); // NUEVO ESTADO: Mapa de Calor
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isCompact, setIsCompact] = useState(false); 
   
@@ -110,7 +111,7 @@ function FlowApp() {
   const [focusModeId, setFocusModeId] = useState(null);
   
   const [isSimulatorMode, setIsSimulatorMode] = useState(false);
-  const [simulatorLimit, setSimulatorLimit] = useState(21); // NUEVO ESTADO: Límite personalizable
+  const [simulatorLimit, setSimulatorLimit] = useState(21); 
   const isSimulatorModeRef = useRef(false); 
   const [simulatorCart, setSimulatorCart] = useState(new Set());
   const [gpaTerms, setGpaTerms] = useState([]); 
@@ -130,7 +131,7 @@ function FlowApp() {
       const sPassed = localStorage.getItem('pensum_passed');
       const sStrict = localStorage.getItem('pensum_strict');
       const sHidePassedEdges = localStorage.getItem('pensum_hide_passed_edges');
-      const sSimLimit = localStorage.getItem('pensum_sim_limit'); // Persistencia de límite
+      const sSimLimit = localStorage.getItem('pensum_sim_limit'); 
       const sGpaTerms = localStorage.getItem('pensum_gpa');
       const sDark = localStorage.getItem('pensum_dark');
       const sCompact = localStorage.getItem('pensum_compact');
@@ -278,6 +279,68 @@ function FlowApp() {
     setBaseGraph({ nodes: bNodes, edges: bEdges, subjectDict: dict, trimestersList: trimesters });
   };
 
+  // --- LÓGICA AUTOCOMPLETADO (SPEEDRUN MODE) ---
+  const handleAutoFill = () => {
+    if (!isSimulatorMode) return;
+
+    // 1. Crear matriz de dependencias hacia el futuro (downstream)
+    const downAdj = {};
+    baseGraph.edges.forEach(e => {
+      if (!downAdj[e.source]) downAdj[e.source] = [];
+      downAdj[e.source].push(e.target);
+    });
+
+    // 2. Extraer todas las materias elegibles
+    const eligibleSubjects = [];
+    Object.keys(baseGraph.subjectDict).forEach(subjId => {
+      if (passedIds.has(subjId)) return;
+      const nData = baseGraph.subjectDict[subjId];
+
+      const isEligible = (nData.prereqs || []).every(pr => {
+        if (passedIds.has(pr)) return true;
+        const prData = baseGraph.subjectDict[pr];
+        if (prData && prData.trimester === nData.trimester) return true;
+        return false;
+      });
+
+      if (isEligible) {
+        // Calcular peso de la materia (cuántas materias desbloquea)
+        const getReachableCount = (startId) => {
+          const v = new Set(); const q = [startId];
+          while (q.length > 0) { 
+            const curr = q.shift(); 
+            (downAdj[curr] || []).forEach(nx => { 
+              if (!v.has(nx)) { v.add(nx); q.push(nx); } 
+            }); 
+          }
+          return v.size;
+        };
+        
+        eligibleSubjects.push({ 
+          id: subjId, 
+          credits: nData.credits, 
+          weight: getReachableCount(subjId) 
+        });
+      }
+    });
+
+    // 3. Ordenar por Peso (mayor a menor) y luego por créditos
+    eligibleSubjects.sort((a, b) => b.weight - a.weight || b.credits - a.credits);
+
+    // 4. Llenar el carrito sin pasarse del límite
+    let currentCredits = 0;
+    const newCart = new Set();
+    
+    for (const subj of eligibleSubjects) {
+      if (currentCredits + subj.credits <= simulatorLimit) {
+        newCart.add(subj.id);
+        currentCredits += subj.credits;
+      }
+    }
+    
+    setSimulatorCart(newCart);
+  };
+
   const onNodeClick = useCallback((_, clickedNode) => {
     if (clickedNode.type === 'trimester') return;
     
@@ -323,6 +386,22 @@ function FlowApp() {
     baseGraph.edges.forEach(e => {
       if (!downAdj[e.source]) downAdj[e.source] = []; downAdj[e.source].push(e.target);
       if (!upAdj[e.target]) upAdj[e.target] = []; upAdj[e.target].push(e.source);
+    });
+
+    // Lógica Mapa de Calor
+    const nodeWeights = {};
+    let maxWeight = 0;
+    baseGraph.nodes.forEach(n => {
+      if (n.type === 'subject' && !passedIds.has(n.id)) {
+        const getReachableCount = (startId) => {
+          const v = new Set(); const q = [startId];
+          while (q.length > 0) { const curr = q.shift(); (downAdj[curr] || []).forEach(nx => { if (!v.has(nx)) { v.add(nx); q.push(nx); } }); }
+          return v.size;
+        };
+        const w = getReachableCount(n.id);
+        nodeWeights[n.id] = w;
+        if (w > maxWeight) maxWeight = w;
+      }
     });
 
     const getReachable = (startId, adj) => {
@@ -393,9 +472,31 @@ function FlowApp() {
           const isSearched = searchTerm.length > 2 && (n.data.name.toLowerCase().includes(searchLower) || n.data.code.toLowerCase().includes(searchLower));
           const isSelectedForGpa = activeTab === 'gpa' && activeTermSubjectCodes.has(n.id);
 
+          // Alterar visualmente para el Mapa de Calor
+          const weight = nodeWeights[n.id] || 0;
+          let finalName = n.data.name;
+          let heatmapStyle = {};
+
+          if (isHeatmapMode && !isPassed) {
+            if (weight > 0) finalName = `🔥 [+${weight}] ${n.data.name}`;
+            const intensity = maxWeight > 0 ? Math.pow(weight / maxWeight, 0.7) : 0;
+            const r = 239; const g = 68; const b = 68;
+            heatmapStyle = {
+              backgroundColor: `rgba(${r}, ${g}, ${b}, ${0.05 + intensity * 0.4})`,
+              borderColor: intensity > 0.5 ? `rgb(${r}, ${g}, ${b})` : undefined,
+              borderWidth: intensity > 0.5 ? '2px' : undefined
+            };
+          }
+
           return { 
-            ...n, hidden: focusModeId && isDimmed, position: { x: 25, y: newY }, 
-            data: { ...n.data, isDarkMode, isCompact, isPassed, isLocked, isHighlighted: isTarget, isDimmed, isSearched, isSelectedForGpa, isSelectedForGoal, isSimulatorEligible, isInSimulatorCart, onToggle: handleToggleSubject, onDoubleClick: handleDoubleClick } 
+            ...n, 
+            hidden: focusModeId && isDimmed, 
+            position: { x: 25, y: newY },
+            style: { ...n.style, ...heatmapStyle },
+            data: { 
+              ...n.data, name: finalName,
+              isDarkMode, isCompact, isPassed, isLocked, isHighlighted: isTarget, isDimmed, isSearched, isSelectedForGpa, isSelectedForGoal, isSimulatorEligible, isInSimulatorCart, onToggle: handleToggleSubject, onDoubleClick: handleDoubleClick 
+            } 
           };
         }
       }
@@ -448,7 +549,7 @@ function FlowApp() {
       progress: { pCredits, tCredits, remainingCrd: tCredits - pCredits, percent: tCredits === 0 ? 0 : Math.round((pCredits / tCredits) * 100), c100, c200, c300 }, 
       simulatorData: { simCredits }, goalTotalCrd: localGoalTotalCrd 
     };
-  }, [baseGraph, passedIds, highlightedNodeId, focusModeId, searchTerm, isStrictMode, hidePassedEdges, activeTab, activeGpaTermId, gpaTerms, isDarkMode, isCompact, isSimulatorMode, simulatorCart, goalSubjects, handleToggleSubject, handleDoubleClick]);
+  }, [baseGraph, passedIds, highlightedNodeId, focusModeId, searchTerm, isStrictMode, hidePassedEdges, isHeatmapMode, activeTab, activeGpaTermId, gpaTerms, isDarkMode, isCompact, isSimulatorMode, simulatorCart, goalSubjects, handleToggleSubject, handleDoubleClick]);
 
   useEffect(() => {
     setNodes(derivedData.dNodes); setEdges(derivedData.dEdges);
@@ -535,6 +636,8 @@ function FlowApp() {
             {isMobile && <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', padding: '6px 10px', background: isDarkMode ? '#334155' : '#e2e8f0', color: textPanel, border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar</button>}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
+            {/* BOTÓN MAPA DE CALOR */}
+            <button onClick={() => setIsHeatmapMode(!isHeatmapMode)} title="Mapa de Calor (Cuellos de Botella)" style={{ fontSize: '16px', background: isHeatmapMode ? '#ef4444' : 'transparent', color: isHeatmapMode ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px', transition: 'background 0.3s' }}>🔥</button>
             <button onClick={toggleCompactMode} title="Modo Compacto" style={{ fontSize: '16px', background: isCompact ? '#3b82f6' : 'transparent', color: isCompact ? '#fff' : textPanel, border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>🗜️</button>
             <button onClick={toggleDarkMode} title="Modo Oscuro" style={{ fontSize: '16px', background: 'transparent', border: `1px solid ${borderPanel}`, borderRadius: '6px', cursor: 'pointer', padding: '4px 8px' }}>{isDarkMode ? '☀️' : '🌙'}</button>
           </div>
@@ -564,7 +667,9 @@ function FlowApp() {
               </div>
               
               <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
-                <button onClick={() => { parseTextToGraph(inputText); if(isMobile) setSidebarOpen(false); }} style={{ flex: 1, padding: '12px', background: isDarkMode ? '#3b82f6' : '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>Renderizar Pensum</button>
+                {!isSimulatorMode && (
+                  <button onClick={() => { parseTextToGraph(inputText); if(isMobile) setSidebarOpen(false); }} style={{ flex: 1, padding: '12px', background: isDarkMode ? '#3b82f6' : '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>Renderizar Pensum</button>
+                )}
                 <button onClick={() => { 
                   if (isSimulatorMode) setSimulatorCart(new Set()); 
                   setIsSimulatorMode(!isSimulatorMode); 
@@ -572,6 +677,13 @@ function FlowApp() {
                 }} style={{ flex: 1, padding: '12px', background: isSimulatorMode ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px' }}>
                   {isSimulatorMode ? `SALIR SIM (${simulatorData.simCredits} CR)` : 'Simulador 🛒'}
                 </button>
+                
+                {/* BOTÓN SPEEDRUN AUTOCOMPLETADO */}
+                {isSimulatorMode && (
+                  <button onClick={handleAutoFill} style={{ flex: 1, padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', minWidth: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                    ⚡ Auto-Llenar
+                  </button>
+                )}
               </div>
               
               <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '5px', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch' }}>
@@ -790,7 +902,7 @@ function FlowApp() {
                   <hr style={{ border: 'none', borderTop: `1px dashed ${borderPanel}`, margin: isMobile ? '6px 0' : '10px 0' }} />
                   
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: isMobile ? '10px' : '11px', color: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 'bold', marginBottom: '6px' }}>
-                    Bloqueo de materias con pre-req incumplidos🔒
+                    Bloqueo Estricto 🔒
                     <input type="checkbox" checked={isStrictMode} onChange={(e) => { setIsStrictMode(e.target.checked); localStorage.setItem('pensum_strict', e.target.checked); }} />
                   </label>
 
